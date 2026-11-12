@@ -1,0 +1,9 @@
+{
+  "name": "aidem-map-prototype",
+  "private": true,
+  "scripts": {
+    "data": "uv run scripts/build_data.py",
+    "data:force": "uv run scripts/build_data.py --force",
+    "serve": "script/server"
+  }
+}

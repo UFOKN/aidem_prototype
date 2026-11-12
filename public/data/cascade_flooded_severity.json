@@ -1,0 +1,26 @@
+[
+ {
+  "severity": "Severe (> 6 ft)",
+  "buildings": 2045,
+  "pop_day": 8891,
+  "pop_night": 4716
+ },
+ {
+  "severity": "Moderate (3-6 ft)",
+  "buildings": 278,
+  "pop_day": 658,
+  "pop_night": 417
+ },
+ {
+  "severity": "Minor (1-3 ft)",
+  "buildings": 177,
+  "pop_day": 1892,
+  "pop_night": 314
+ },
+ {
+  "severity": "Nuisance (0-1 ft)",
+  "buildings": 87,
+  "pop_day": 2932,
+  "pop_night": 301
+ }
+]

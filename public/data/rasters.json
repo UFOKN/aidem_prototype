@@ -1,0 +1,65 @@
+{
+  "depth_max": {
+    "url": "data/depth_max.pmtiles",
+    "encoding": "custom",
+    "redFactor": 256.0,
+    "greenFactor": 1.0,
+    "blueFactor": 0.00390625,
+    "baseShift": 1.0,
+    "tileSize": 512,
+    "minzoom": 8,
+    "maxzoom": 16,
+    "bounds": [
+      -79.076843,
+      40.216635,
+      -78.673096,
+      40.472024
+    ],
+    "units": "ft",
+    "nodata": -1.0,
+    "min": 0.002,
+    "max": 78.805
+  },
+  "velocity_max": {
+    "url": "data/velocity_max.pmtiles",
+    "encoding": "custom",
+    "redFactor": 256.0,
+    "greenFactor": 1.0,
+    "blueFactor": 0.00390625,
+    "baseShift": 1.0,
+    "tileSize": 512,
+    "minzoom": 8,
+    "maxzoom": 16,
+    "bounds": [
+      -79.076843,
+      40.216635,
+      -78.673096,
+      40.472024
+    ],
+    "units": "ft/s",
+    "nodata": -1.0,
+    "min": 0.0,
+    "max": 298.808
+  },
+  "arrival_first": {
+    "url": "data/arrival_first.pmtiles",
+    "encoding": "custom",
+    "redFactor": 256.0,
+    "greenFactor": 1.0,
+    "blueFactor": 0.00390625,
+    "baseShift": 1.0,
+    "tileSize": 512,
+    "minzoom": 8,
+    "maxzoom": 16,
+    "bounds": [
+      -79.076843,
+      40.216635,
+      -78.673096,
+      40.472024
+    ],
+    "units": "h",
+    "nodata": 200.0,
+    "min": 0.0,
+    "max": 17.519
+  }
+}

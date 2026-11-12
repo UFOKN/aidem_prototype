@@ -1,0 +1,7 @@
+# Data build cache (reprojected rasters, full terrain, map captures): safe to delete
+build/
+node_modules/
+.DS_Store
+*.tmp
+__pycache__/
+FIGMA.md

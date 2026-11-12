@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AidEM Map Prototype</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.15.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="map/core.css">
+  <link rel="stylesheet" href="map/panel.css">
+</head>
+<body>
+  <!-- Explorer: the shared map (map/core.js) plus the layer panel. -->
+  <div id="map"></div>
+  <script type="module">
+    import { createMap } from "./map/core.js";
+    import { createPanel } from "./map/panel.js";
+
+    const app = await createMap({ container: "map", hash: true, terrain: true });
+    createPanel(app);
+    window.app = app;
+  </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+/* Layer panel (panel.js). Colours share names with the "Story UI"
+   variables in Figma (panel/bg there is --panel-bg here). */
+:root { --panel-bg: #ffffff; --panel-text: #222222; --panel-muted: #666666; --panel-border: #e3e3e3; }
+.layer-panel {
+  position: absolute; top: 10px; left: 10px; z-index: 1;
+  display: flex; flex-direction: column; gap: 10px; width: 254px;
+  font: 13px/1.4 system-ui, sans-serif; color: var(--panel-text);
+}
+.layer-panel .panel-card {
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel-bg) 95%, transparent); border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.layer-panel h2 { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--panel-muted); }
+.layer-panel section + section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
+.layer-panel label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.layer-panel label.disabled { cursor: default; opacity: 0.5; }
+.layer-panel input[type=range] { width: 100%; margin: 4px 0 0; }
+.layer-panel .advance { margin-top: 6px; }
+.layer-panel .advance[hidden] { display: none; }
+.layer-panel .clock { display: flex; align-items: center; gap: 8px; }
+.layer-panel .clock button { width: 28px; height: 24px; border: 1px solid #bbb; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; }
+.layer-panel .clock strong { font-variant-numeric: tabular-nums; }
+.layer-panel .ticks { position: relative; height: 12px; font-size: 10px; color: #888; }
+.layer-panel .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+/* Segmented toggle for the flood layer (Figma: like the toolbar's audience switch).
+   Pages can colour it with --segment-* (story 1 uses the slate scheme). */
+.layer-panel .segmented { display: flex; gap: 1px; }
+.layer-panel .segmented button {
+  flex: 1; height: 24px; padding: 0 8px; border: 0; border-radius: 0; background: var(--segment-bg, #8d8d8d); color: var(--segment-text, #000000);
+  font: 15px/1.22 Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap;
+}
+.layer-panel .segmented button[aria-pressed="false"] { background: var(--segment-off-bg, #8d8d8d); color: var(--segment-off-text, #000000); opacity: var(--segment-off-opacity, 0.5); }
+/* Stepped scale for depth and velocity (legend("depth"), legend("velocity")) */
+.legend .scale { flex: 1 1 100%; padding: 2px 0 0; }
+.legend .scale .bar { display: flex; gap: 1px; height: 10px; }
+.legend .scale .bar i { flex: 1; width: auto; height: auto; border-radius: 0; }
+.legend .scale .ticks { position: relative; height: 14px; margin-top: 2px; font-size: 11px; color: #555; }
+.legend .scale .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.legend .scale .ticks span:last-child { transform: translateX(-30%); }

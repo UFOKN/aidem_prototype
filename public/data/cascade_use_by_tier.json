@@ -1,0 +1,80 @@
+{
+ "primary": [
+  {
+   "use": "Homes",
+   "buildings": 1731,
+   "pop_day": 2829,
+   "pop_night": 5257
+  },
+  {
+   "use": "Businesses",
+   "buildings": 619,
+   "pop_day": 5148,
+   "pop_night": 330
+  },
+  {
+   "use": "Industry",
+   "buildings": 127,
+   "pop_day": 736,
+   "pop_night": 48
+  },
+  {
+   "use": "Public buildings",
+   "buildings": 110,
+   "pop_day": 5660,
+   "pop_night": 113
+  }
+ ],
+ "secondary": [
+  {
+   "use": "Homes",
+   "buildings": 40055,
+   "pop_day": 37253,
+   "pop_night": 84571
+  },
+  {
+   "use": "Businesses",
+   "buildings": 5059,
+   "pop_day": 18146,
+   "pop_night": 1905
+  },
+  {
+   "use": "Industry",
+   "buildings": 439,
+   "pop_day": 2948,
+   "pop_night": 136
+  },
+  {
+   "use": "Public buildings",
+   "buildings": 745,
+   "pop_day": 20512,
+   "pop_night": 2277
+  }
+ ],
+ "tertiary": [
+  {
+   "use": "Homes",
+   "buildings": 1870,
+   "pop_day": 1412,
+   "pop_night": 3900
+  },
+  {
+   "use": "Businesses",
+   "buildings": 597,
+   "pop_day": 618,
+   "pop_night": 127
+  },
+  {
+   "use": "Industry",
+   "buildings": 9,
+   "pop_day": 77,
+   "pop_night": 1
+  },
+  {
+   "use": "Public buildings",
+   "buildings": 27,
+   "pop_day": 62,
+   "pop_night": 5
+  }
+ ]
+}

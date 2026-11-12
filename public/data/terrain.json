@@ -1,0 +1,21 @@
+{
+  "bbox": [
+    -79.278717,
+    40.08894,
+    -78.471223,
+    40.599718
+  ],
+  "detailBbox": [
+    -79.117218,
+    40.191096,
+    -78.632721,
+    40.497563
+  ],
+  "coarseMaxzoom": 11,
+  "detailMaxzoom": 14,
+  "fullSources": [
+    "planet.pmtiles",
+    "6-17-24.pmtiles",
+    "6-18-24.pmtiles"
+  ]
+}

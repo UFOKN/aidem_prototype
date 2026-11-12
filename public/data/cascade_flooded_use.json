@@ -1,0 +1,26 @@
+[
+ {
+  "use": "Homes",
+  "buildings": 1731,
+  "pop_day": 2829,
+  "pop_night": 5257
+ },
+ {
+  "use": "Businesses",
+  "buildings": 619,
+  "pop_day": 5148,
+  "pop_night": 330
+ },
+ {
+  "use": "Industry",
+  "buildings": 127,
+  "pop_day": 736,
+  "pop_night": 48
+ },
+ {
+  "use": "Public buildings",
+  "buildings": 110,
+  "pop_day": 5660,
+  "pop_night": 113
+ }
+]

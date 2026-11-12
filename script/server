@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# script/server: Serve the prototype (public/) locally at http://localhost:8080.
+#                PMTiles needs HTTP range requests, so this uses http-server
+#                rather than `python -m http.server`. Caching is off (-c-1) so
+#                edits show on reload. Stop it with Ctrl-C.
+#
+#   script/server            # port 8080
+#   PORT=8081 script/server  # another port
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+PORT="${PORT:-8080}"
+
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port $PORT is already in use (the prototype may already be running): http://localhost:$PORT"
+  exit 1
+fi
+
+exec npx --yes http-server@14.1.1 public -p "$PORT" -c-1

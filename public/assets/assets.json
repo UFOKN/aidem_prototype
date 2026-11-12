@@ -1,0 +1,9 @@
+{
+  "commit": "028c18f713baecad011301ff7a69acc39bcc2ae7",
+  "fonts": [
+    "Noto Sans Regular",
+    "Noto Sans Medium",
+    "Noto Sans Italic"
+  ],
+  "sprites": "sprites/v4/"
+}

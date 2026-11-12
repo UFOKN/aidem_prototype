@@ -1,0 +1,165 @@
+{
+  "note": "affected: every building or facility that loses something in the tier (tiers overlap); first_affected: counted once, in its earliest tier (adds up to the total); times in hours after the dam failure",
+  "round": 2,
+  "fail_depth_ft": 2.0,
+  "building_depth_ft": 0.0,
+  "dam_failure_h": 8.83,
+  "buildings": {
+    "primary": {
+      "affected": {
+        "observed": {
+          "count": 2587,
+          "pop_night": 5748,
+          "pop_day": 14373
+        }
+      },
+      "first_affected": {
+        "count": 2587,
+        "pop_night": 5748,
+        "pop_day": 14373
+      },
+      "first_affected_from_h": -8.83
+    },
+    "secondary": {
+      "affected": {
+        "modelled": {
+          "count": 43891,
+          "pop_night": 84308,
+          "pop_day": 74496
+        },
+        "potential": {
+          "count": 2407,
+          "pop_night": 4581,
+          "pop_day": 4363
+        }
+      },
+      "first_affected": {
+        "count": 46298,
+        "pop_night": 88889,
+        "pop_day": 78859
+      },
+      "first_affected_from_h": -8.83
+    },
+    "tertiary": {
+      "affected": {
+        "modelled": {
+          "count": 35530,
+          "pop_night": 70784,
+          "pop_day": 63919
+        },
+        "potential": {
+          "count": 2400,
+          "pop_night": 4392,
+          "pop_day": 2867
+        }
+      },
+      "first_affected": {
+        "count": 2503,
+        "pop_night": 4033,
+        "pop_day": 2169
+      },
+      "first_affected_from_h": -8.83
+    }
+  },
+  "facilities": {
+    "primary": {
+      "affected": {
+        "observed": {
+          "count": 22
+        }
+      },
+      "first_affected": {
+        "count": 22
+      },
+      "first_affected_from_h": -8.83,
+      "affected_by_type": {
+        "Fire Stations": 5,
+        "Schools": 4,
+        "Law Enforcement": 3,
+        "Intermodal Terminal Facilities": 2,
+        "EMS": 2,
+        "Broadcast Communication": 1,
+        "Gas-Fired Power Plant": 1,
+        "Fire Stations EMS": 1,
+        "Correctional Facilities": 1,
+        "Hospitals": 1,
+        "Wastewater Treatment Plants": 1
+      }
+    },
+    "secondary": {
+      "affected": {
+        "modelled": {
+          "count": 39
+        },
+        "potential": {
+          "count": 2
+        }
+      },
+      "first_affected": {
+        "count": 41
+      },
+      "first_affected_from_h": -8.83,
+      "affected_by_type": {
+        "Schools": 21,
+        "Colleges and Universities": 6,
+        "Fire Stations EMS": 3,
+        "EMS": 3,
+        "Fire Stations": 3,
+        "Hospitals": 2,
+        "Broadcast Communication": 1,
+        "Heliports": 1,
+        "Law Enforcement": 1
+      }
+    },
+    "tertiary": {
+      "affected": {},
+      "first_affected": {
+        "count": 0
+      },
+      "first_affected_from_h": null,
+      "affected_by_type": {}
+    }
+  },
+  "failed_providers": {
+    "primary": {
+      "Broadcast Communication": 1,
+      "EMS": 2,
+      "Fire Stations": 5,
+      "Fire Stations EMS": 1,
+      "Gas-Fired Power Plant": 1,
+      "Hospitals": 1,
+      "Law Enforcement": 3,
+      "Public Water System": 4,
+      "Schools": 4,
+      "Wastewater Treatment Plants": 1
+    },
+    "secondary": {
+      "Broadcast Communication": 1,
+      "EMS": 3,
+      "Fire Stations": 3,
+      "Fire Stations EMS": 3,
+      "Hospitals": 2,
+      "Law Enforcement": 1,
+      "Schools": 21
+    },
+    "tertiary": {}
+  },
+  "wet_below_fail_depth": [
+    {
+      "name": "FOREST HILLS EL SCH",
+      "type": "Schools",
+      "depth_ft": 0.18
+    },
+    {
+      "name": "GREATER JOHNSTOWN MS",
+      "type": "Schools",
+      "depth_ft": 0.19
+    }
+  ],
+  "substation_yards_wet": [
+    {
+      "name": "South Fork Substation (Penelec)",
+      "max_depth_ft": 1.11
+    }
+  ]
+}
