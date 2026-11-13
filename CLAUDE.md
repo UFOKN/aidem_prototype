@@ -7,7 +7,7 @@ Flood scenario prototype for the South Fork Dam: MapLibre and PMTiles, static fi
 - `public/stories/fade.js` fades through black between story 1 and story 3 (`fadeTo(url)`); pages load it in `<head>` so the fade-in starts before the first paint.
 - Shared map code is `public/map/core.js` (`createMap` and its options), `panel.js` (layer panel, legends) and `core.css`.
 
-Run the site with `./script server` (port 8080). It's deployed to GitHub Pages from `public/` (README, Deploy); keep every file under 100 MB. The data build is `uv run scripts/build_data.py`. To run one build step on its own, load the script with `uv run --with pyshp --with pyproj --with rasterio --with numpy --with pillow --with shapely --with scipy python` and call the function.
+Run the site with `./script server` (port 8080). It's deployed to GitHub Pages from `public/` (README, Deploy); keep every file under 100 MB. Locally, `public/data/terrain.pmtiles` may be the full zoom-15 copy (`build/terrain-z15.pmtiles`, 242 MB), hidden from git with `git update-index --skip-worktree`; the committed file is the 69 MB zoom-14 cut. Undo with `git update-index --no-skip-worktree public/data/terrain.pmtiles && git checkout public/data/terrain.pmtiles`. The data build is `uv run scripts/build_data.py`. To run one build step on its own, load the script with `uv run --with pyshp --with pyproj --with rasterio --with numpy --with pillow --with shapely --with scipy python` and call the function.
 
 ## Figma
 

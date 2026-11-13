@@ -837,15 +837,15 @@
 
     // --- Story card -------------------------------------------------------------
     // Step 1 is the report (any page but the plan), step 2 the plan page
-    // before the EAP upload, step 3 after it. Its button scrolls to the
-    // notices and brings the closing card (step 4, Figma 311:1036), whose
+    // before the EAP upload, step 3 after it. Its Next brings the closing
+    // card (step 4, Figma 311:1036), whose
     // "Start over" fades to black and back to the start of story 1.
     const STORY_1 = "../story-1/";
     const card = document.querySelector(".card"), next = card.querySelector(".next"), prev = card.querySelector(".prev");
     const STEPS = [
-      { text: ["Emergency Managers get an accessible summary of all data."], next: "Add local context →" },
-      { text: ["Emergency Managers get an accessible summary of all data.", "And they can add local context, such as their county Emergency Action Plan."], next: "Upload Cambria County EAP →" },
-      { text: ["EMs draft effective evacuation notices by drawing on actionable data and using best practices"], next: "Edit evacuation notices" },
+      { text: ["USACE has great data, but no authority to warn the public.", "Local emergency managers have that authority, but most aren’t trained to interpret flood data and have few resources for flood planning.", "With AidEM, emergency managers get an accessible summary of the potential flood."], next: "Add local context →" },
+      { text: ["EMs can add local context, such as their county Emergency Action Plan."], next: "Upload Cambria County EAP →" },
+      { text: ["Today, flood warnings often arrive late or are too vague to act on.", "With AidEM, officials draft effective evacuation notices by incorporating actionable data and FEMA best practices."], next: "Next" },
       { text: ["Floods are becoming more frequent and many U.S. dams are aging. ", "AidEM helps agencies prepare the public — with state-of-the-art flood mapping presented in an accessible way for all stakeholders. And with effective evacuation notices that enable residents to act.", { note: "May disasters like the Johnstown Flood never repeat." }], next: "Start over", startOver: false },
     ];
     let closing = false; // the closing card (step 4), until the page changes
@@ -861,7 +861,7 @@
     next.addEventListener("click", () => {
       if (step() === 0) { uploaded = false; goPage("plan"); }
       else if (step() === 1) { uploaded = true; render("plan"); }
-      else if (step() === 2) { main.querySelector("#notices")?.scrollIntoView({ behavior: "smooth" }); closing = true; syncCard(); }
+      else if (step() === 2) { closing = true; syncCard(); }
       else fadeTo(STORY_1 + "#1"); // fade.js
     });
     prev.addEventListener("click", () => {

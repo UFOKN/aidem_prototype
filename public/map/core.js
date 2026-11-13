@@ -133,6 +133,14 @@ export const UTILITY_AREAS = {
   "Public Water System": { label: "Drinking water (potentially at risk)", color: "#37474f", dashed: true },
 };
 const tierColor = (prop) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, v.color]), "#999"];
+const withAlpha = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")}, ${a})`;
+// Losses with no time (potential) are lighter: in the colour's alpha rather
+// than the opacity, so every impact building shares one opacity and a fade
+// (fadeInIndirectBuildings) ends exactly on each one's usual look.
+const POTENTIAL_ALPHA = 0.4; // x 0.75 opacity = 0.3
+const indirectColor = ["case", ["get", "potential"],
+  ["match", ["get", "tier"], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, withAlpha(v.color, POTENTIAL_ALPHA)]), withAlpha("#999999", POTENTIAL_ALPHA)],
+  tierColor("tier")];
 const SELECTED_OPACITY = 0.9; // buildings of the selected facility
 // Impact buildings: hidden until their time (feature state "hidden"), faded
 // while a facility's own buildings show (feature state "dim"). k (0-1) is how
@@ -140,9 +148,9 @@ const SELECTED_OPACITY = 0.9; // buildings of the selected facility
 const DIM_OPACITY = 0.08;
 const hiddenOr = (dimmed, normal) => ["case", ["boolean", ["feature-state", "hidden"], false], 0, ["boolean", ["feature-state", "dim"], false], dimmed, normal];
 const towardsDim = (v, k) => v + (DIM_OPACITY - v) * k;
-// Losses with no time (potential) are lighter.
-const indirectOpacity = (k = 1) => hiddenOr(["case", ["get", "potential"], towardsDim(0.3, k), towardsDim(0.75, k)], ["case", ["get", "potential"], 0.3, 0.75]);
-const floodedOpacity = (k = 1) => hiddenOr(towardsDim(0.75, k), 0.75);
+const IMPACT_OPACITY = 0.75;
+const indirectOpacity = (k = 1) => hiddenOr(towardsDim(IMPACT_OPACITY, k), IMPACT_OPACITY);
+const floodedOpacity = indirectOpacity;
 const FACILITY_PENDING = "#b0b0b0"; // facilities not yet affected (flood advance)
 
 // Modern dam (built by the pipeline, see DAM_* in scripts/build_data.py),
@@ -469,28 +477,6 @@ export async function createMap(opts) {
           paint: { "line-color": zoneColor, "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2.5, 1.2] },
         },
         {
-          // Buildings that lose a service, one dot each, in their first tier
-          // (the flooded ones are cascade-flooded, drawn above).
-          id: "cascade-buildings", type: "circle", source: "impact-buildings", filter: [">=", ["get", "tier"], 2],
-          layout: { visibility: visibleAt("indirectImpacts"), "circle-sort-key": ["-", 0, ["get", "tier"]] },
-          paint: {
-            "circle-color": tierColor("tier"),
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
-            // Hidden until its impact time (feature state, see syncCascadeTime);
-            // potential losses (no time) lighter.
-            "circle-opacity": indirectOpacity(),
-          },
-        },
-        {
-          id: "cascade-flooded", type: "circle", source: "impact-flooded",
-          layout: { visibility: visibleAt("directImpacts") },
-          paint: {
-            "circle-color": IMPACT_TIERS[1].color,
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
-            "circle-opacity": floodedOpacity(),
-          },
-        },
-        {
           id: "dam", type: "fill-extrusion", source: "dam", filter: ["in", ["get", "kind"], ["literal", ["body", "spill"]]],
           layout: { visibility: visibleAt("dam") },
           paint: {
@@ -524,6 +510,28 @@ export async function createMap(opts) {
             ],
             "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
             "fill-extrusion-opacity": 0.3,
+          },
+        },
+        {
+          // Buildings that lose a service, one dot each, in their first tier
+          // (the flooded ones are cascade-flooded, drawn above). Above the 3D
+          // buildings, so the extrusions don't cover them.
+          id: "cascade-buildings", type: "circle", source: "impact-buildings", filter: [">=", ["get", "tier"], 2],
+          layout: { visibility: visibleAt("indirectImpacts"), "circle-sort-key": ["-", 0, ["get", "tier"]] },
+          paint: {
+            "circle-color": indirectColor,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
+            // Hidden until its impact time (feature state, see syncCascadeTime)
+            "circle-opacity": indirectOpacity(),
+          },
+        },
+        {
+          id: "cascade-flooded", type: "circle", source: "impact-flooded",
+          layout: { visibility: visibleAt("directImpacts") },
+          paint: {
+            "circle-color": IMPACT_TIERS[1].color,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
+            "circle-opacity": floodedOpacity(),
           },
         },
         {
@@ -778,22 +786,26 @@ export async function createMap(opts) {
 
     /**
      * Fade the buildings that lose a service (the indirect impacts layer) in
-     * over `ms`. Animated with a plain opacity, then the layer's own styling
-     * (potential lighter, hidden until their time) comes back.
+     * over `ms`, with a plain opacity up to the usual one (IMPACT_OPACITY; a
+     * plain number is cheap to change every frame, an expression makes
+     * MapLibre rebuild all the dots), then the layer's own styling (hidden
+     * until their time) comes back.
      */
     async fadeInIndirectBuildings(ms = 1200) {
-      const id = "cascade-buildings", styled = map.getPaintProperty(id, "circle-opacity");
+      const id = "cascade-buildings";
+      map.setPaintProperty(id, "circle-opacity-transition", { duration: 0, delay: 0 }); // animated frame by frame
+      map.setPaintProperty(id, "circle-opacity", 0);
       map.setLayoutProperty(id, "visibility", "visible");
       const t0 = performance.now();
       await new Promise((resolve) => {
         const frame = (now) => {
           const k = Math.min(1, Math.max(0, (now - t0) / ms));
-          map.setPaintProperty(id, "circle-opacity", 0.75 * k);
+          map.setPaintProperty(id, "circle-opacity", IMPACT_OPACITY * k);
           if (k < 1) requestAnimationFrame(frame); else resolve();
         };
         requestAnimationFrame(frame);
       });
-      map.setPaintProperty(id, "circle-opacity", styled);
+      map.setPaintProperty(id, "circle-opacity", indirectOpacity(dimFade));
     },
 
     /** Turn the reader's map controls (pan, zoom, rotate) on or off. */
@@ -961,11 +973,16 @@ export async function createMap(opts) {
     // dimming the others first would make the layer dip and come back.
     const crossFade = fade && on;
     const setFade = (k) => {
-      // The other layers only when they change, so a selection doesn't cut
-      // into fadeInIndirectBuildings.
-      if (k !== 1 || dimFade !== 1) {
-        map.setPaintProperty("cascade-buildings", "circle-opacity", indirectOpacity(k));
-        map.setPaintProperty("cascade-flooded", "circle-opacity", floodedOpacity(k));
+      // While fading, every impact dot is dimmed alike, so a plain number does
+      // (cheap every frame; an expression makes MapLibre rebuild all the dots).
+      // Otherwise the other layers only when they change, so a selection
+      // doesn't cut into fadeInIndirectBuildings.
+      if (k !== 1) {
+        map.setPaintProperty("cascade-buildings", "circle-opacity", towardsDim(IMPACT_OPACITY, k));
+        map.setPaintProperty("cascade-flooded", "circle-opacity", towardsDim(IMPACT_OPACITY, k));
+      } else if (dimFade !== 1) {
+        map.setPaintProperty("cascade-buildings", "circle-opacity", indirectOpacity());
+        map.setPaintProperty("cascade-flooded", "circle-opacity", floodedOpacity());
       }
       // The facility's own buildings come up faster than the others go down,
       // so the dots both layers share never get lighter on the way.
