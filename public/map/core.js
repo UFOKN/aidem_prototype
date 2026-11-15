@@ -182,15 +182,13 @@ export function zonePopupHtml(p) {
         <tr><th>&nbsp; critical structures</th><td>${p.Crt_Collps}%</td></tr>
       </tbody>
       <tbody>
-        <tr><th>Population at risk (day)</th><td>${fmt(p.PAR_Day)}</td></tr>
-        <tr><th>Population at risk (night)</th><td>${fmt(p.PAR_Nght)}</td></tr>
+        <tr><th>Population at risk</th><td>${fmt(p.PAR_Day)}</td></tr>
       </tbody>
     </table>
     <table style="margin-top:8px">
       <thead><tr><th class="sub">Life loss</th><th>0–2 h warning</th><th>2–6 h warning</th></tr></thead>
       <tbody>
-        <tr><th>Day failure</th><td>${fmt(p.LL_D_Min)}</td><td>${fmt(p.LL_D_Amp)}</td></tr>
-        <tr><th>Night failure</th><td>${fmt(p.LL_N_Min)}</td><td>${fmt(p.LL_N_Amp)}</td></tr>
+        <tr><th>Direct</th><td>${fmt(p.LL_D_Min)}</td><td>${fmt(p.LL_D_Amp)}</td></tr>
         <tr><th>Indirect</th><td colspan="2">${fmt(p.Ind_LL)}</td></tr>
       </tbody>
     </table>
@@ -200,7 +198,7 @@ export function zonePopupHtml(p) {
         <tr><th>Typical flood arrival</th><td>${p.Arrv_lowq}–${p.Arrv_uppq} h</td></tr>
       </tbody>
     </table>
-    <div class="note">Life loss is the mean for one scenario (day or night, warning time); don't add the columns. Typical = 25th–75th percentile.</div>`;
+    <div class="note">Life loss is the mean for one scenario (warning time); don't add the columns. Typical = 25th–75th percentile.</div>`;
 }
 
 /** "8:50 h before the breach" / "0:54 h after the breach" / null without a time. */

@@ -365,19 +365,19 @@
     // (no time) last. The type is a small label under the facility's name.
     const byTime = (rows) => [...rows].sort((a, b) => (a.h ?? Infinity) - (b.h ?? Infinity));
     const impactTable = (rows) => `<table class="impacts">
-          <tr><th style="width:36%">Facility</th><th style="width:20%">What happens</th><th style="width:15%">Time to failure</th><th>Affected buildings</th><th>Affected people (day)</th><th>Affected people (night)</th></tr>
-          ${byTime(rows).map((r) => `<tr><td>${r.name}<span class="type">${r.type}</span></td><td>${cell(r.what)}</td><td>${cell(r.when)}</td><td>${cell(r.b)}</td><td>${cell(r.d)}</td><td>${cell(r.night)}</td></tr>`).join("")}
+          <tr><th style="width:36%">Facility</th><th style="width:20%">What happens</th><th style="width:15%">Time to failure</th><th>Affected buildings</th><th>Affected people</th></tr>
+          ${byTime(rows).map((r) => `<tr><td>${r.name}<span class="type">${r.type}</span></td><td>${cell(r.what)}</td><td>${cell(r.when)}</td><td>${cell(r.b)}</td><td>${cell(r.d)}</td></tr>`).join("")}
         </table>`;
     const utilRow = (p) => {
       const f = facOf(p.name);
       return { name: titleCase(p.name), type: UTIL_TYPE[p.kind] ?? p.kind,
         what: f?.tier === 1 ? `Floods (${f.depth_ft} ft)` : p.kind === "Public Water System" ? "Flood enters its service area" : null,
-        h: p.offline_h, when: whenText(p.offline_h), b: n(p.buildings), d: n(p.pop_day), night: n(p.pop_night) };
+        h: p.offline_h, when: whenText(p.offline_h), b: n(p.buildings), d: n(p.pop_day) };
     };
     const facRow = (p) => {
       const a = areaOf(p.name);
       return { name: titleCase(p.name), type: p.type, what: p.tier === 1 ? `Floods (${p.depth_ft} ft)` : `Loses ${p.services}`,
-        h: p.impact_h, when: whenText(p.impact_h), b: a && n(a.buildings), d: a && n(a.pop_day), night: a && n(a.pop_night) };
+        h: p.impact_h, when: whenText(p.impact_h), b: a && n(a.buildings), d: a && n(a.pop_day) };
     };
 
     // --- Content blocks ------------------------------------------------------------
@@ -386,10 +386,9 @@
       <div class="figures">
         <div class="figure-table">
           <table class="num">
-            <tr><th></th><th>Day</th><th>Night</th></tr>
-            <tr><td>People at risk</td><td>${n(sum("PAR_Day"))}</td><td>${n(sum("PAR_Nght"))}</td></tr>
-            <tr><td>Estimated deaths, 0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td><td>${n(sum("LL_N_Min"))}</td></tr>
-            <tr><td>Indirect deaths (LifeSim, no day or night split)</td><td colspan="2">${n(sum("Ind_LL"))}</td></tr>
+            <tr><td>People at risk</td><td>${n(sum("PAR_Day"))}</td></tr>
+            <tr><td>Estimated deaths, 0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td></tr>
+            <tr><td>Indirect deaths (LifeSim)</td><td>${n(sum("Ind_LL"))}</td></tr>
           </table>
         </div>
       </div>
@@ -397,13 +396,13 @@
     const summaryHtml = `
       <section>
         <h2>Summary</h2>
-        <p class="lead">If South Fork Dam fails, about ${about(sum("PAR_Day"), 100)} people are directly in the flood’s path during the day and ${about(sum("PAR_Nght"), 100)} at night.${impacts ? ` Another ${about(first("secondary").pop_day + first("tertiary").pop_day, 1000)} by day and ${about(first("secondary").pop_night + first("tertiary").pop_night, 1000)} at night lose a service such as power, sewer or hospital care, because a facility they rely on fails.` : ""} ${n(sum("All_Struct"))} buildings are in the flood zone, ${n(sum("Crt_Struct"))} of them critical facilities. With little warning, a daytime failure could cost around ${about(sum("LL_D_Min"), 100)} lives.</p>
+        <p class="lead">If South Fork Dam fails during the day, about ${about(sum("PAR_Day"), 100)} people are directly in the flood’s path.${impacts ? ` Another ${about(first("secondary").pop_day + first("tertiary").pop_day, 1000)} lose a service such as power, sewer or hospital care, because a facility they rely on fails.` : ""} ${n(sum("All_Struct"))} buildings are in the flood zone, ${n(sum("Crt_Struct"))} of them critical facilities. With little warning, a daytime failure could cost around ${about(sum("LL_D_Min"), 100)} lives.</p>
       </section>`;
     const zoneTable = `
       <table class="num zone-table">
-        <tr><th>Buildings and people in the flood zone</th><th>Buildings</th><th>People (day)</th><th>People (night)</th></tr>
-        ${zones.map((p) => `<tr><td>${zone(p)}</td><td>${n(p.All_Struct)}</td><td>${n(p.PAR_Day)}</td><td>${n(p.PAR_Nght)}</td></tr>`).join("")}
-        <tr class="total"><td>All zones</td><td>${n(sum("All_Struct"))}</td><td>${n(sum("PAR_Day"))}</td><td>${n(sum("PAR_Nght"))}</td></tr>
+        <tr><th>Buildings and people in the flood zone</th><th>Buildings</th><th>People</th></tr>
+        ${zones.map((p) => `<tr><td>${zone(p)}</td><td>${n(p.All_Struct)}</td><td>${n(p.PAR_Day)}</td></tr>`).join("")}
+        <tr class="total"><td>All zones</td><td>${n(sum("All_Struct"))}</td><td>${n(sum("PAR_Day"))}</td></tr>
       </table>`;
     const floodHtml = `
       <section>
@@ -424,9 +423,9 @@
     // building with water at it), so they add up to more than LifeSim's people at risk.
     const severityTable = severity ? `
         <table class="num" style="margin-top:32px; max-width:560px">
-          <tr><th>By flood severity</th><th>Buildings</th><th>People (day)</th><th>People (night)</th></tr>
-          ${severity.map((r) => `<tr><td>${r.severity}</td><td>${n(r.buildings)}</td><td>${n(r.pop_day)}</td><td>${n(r.pop_night)}</td></tr>`).join("")}
-          <tr class="total"><td>Total</td>${["buildings", "pop_day", "pop_night"].map((k) => `<td>${n(severity.reduce((a, r) => a + r[k], 0))}</td>`).join("")}</tr>
+          <tr><th>By flood severity</th><th>Buildings</th><th>People</th></tr>
+          ${severity.map((r) => `<tr><td>${r.severity}</td><td>${n(r.buildings)}</td><td>${n(r.pop_day)}</td></tr>`).join("")}
+          <tr class="total"><td>Total</td>${["buildings", "pop_day"].map((k) => `<td>${n(severity.reduce((a, r) => a + r[k], 0))}</td>`).join("")}</tr>
         </table>` : "";
     const peopleHtml = `
       <section>
@@ -437,14 +436,14 @@
       <section>
         <h3 class="q">Affected people and infrastructure</h3>
         <table class="num expandable">
-          <tr><th></th><th>Buildings</th><th>People (day)</th><th>People (night)</th></tr>
+          <tr><th></th><th>Buildings</th><th>People</th></tr>
           ${[["primary", "Flooded"], ["secondary", "Lose a service"], ["tertiary", "Depends on facility that loses service"]].map(([t, label]) => {
             const uses = useByTier?.[t] ?? (t === "primary" ? byUse : null);
             const toggle = uses ? `<button class="expand" aria-expanded="false" aria-label="Show buildings by use"></button>` : "";
-            return `<tr data-tier="${t}"><td>${toggle}<i style="background:${TIER_COLORS[t]}"></i>${label}</td><td>${n(first(t).count)}</td><td>${n(first(t).pop_day)}</td><td>${n(first(t).pop_night)}</td></tr>`
-              + (uses ?? []).map((r) => `<tr class="use" data-tier="${t}" hidden><td>${r.use}</td><td>${n(r.buildings)}</td><td>${n(r.pop_day)}</td><td>${n(r.pop_night)}</td></tr>`).join("");
+            return `<tr data-tier="${t}"><td>${toggle}<i style="background:${TIER_COLORS[t]}"></i>${label}</td><td>${n(first(t).count)}</td><td>${n(first(t).pop_day)}</td></tr>`
+              + (uses ?? []).map((r) => `<tr class="use" data-tier="${t}" hidden><td>${r.use}</td><td>${n(r.buildings)}</td><td>${n(r.pop_day)}</td></tr>`).join("");
           }).join("")}
-          <tr class="total"><td>All</td>${["count", "pop_day", "pop_night"].map((k) => `<td>${n(["primary", "secondary", "tertiary"].reduce((a, t) => a + first(t)[k], 0))}</td>`).join("")}</tr>
+          <tr class="total"><td>All</td>${["count", "pop_day"].map((k) => `<td>${n(["primary", "secondary", "tertiary"].reduce((a, t) => a + first(t)[k], 0))}</td>`).join("")}</tr>
         </table>
         <div class="live-map" data-map="county" style="margin-top:24px; height:708px"></div>
         <h3>Which facilities are affected?</h3>
@@ -483,17 +482,14 @@
     const noticeCard = (title, body, kind = "", parts = null) => `<div class="notice ${kind}"${parts ? ` data-parts="${JSON.stringify(parts).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"` : ""}><div class="notice-head"><h5 class="title">${title}</h5><button class="edit">Edit</button></div><p class="body">${body}</p></div>`;
     // Zones as columns, figures as rows (LifeSim results per zone).
     const ZONE_ROWS = [
-      ["People (day)", (p) => n(p.PAR_Day)],
-      ["People (night)", (p) => n(p.PAR_Nght)],
+      ["People", (p) => n(p.PAR_Day)],
       ["Typical flood arrival", (p) => `${p.Arrv_lowq}–${p.Arrv_uppq} h`],
       ["Typical depth", (p) => `${p.Depth_lowq}–${p.Depth_uppq} ft`],
       ["Buildings flooded", (p) => n(p.All_Struct)],
       ["Critical facilities", (p) => n(p.Crt_Struct)],
       ["Likely to collapse", (p) => `${p.All_Collps}%`],
-      ["Life loss (day), 0–2 h warning", (p) => n(p.LL_D_Min)],
-      ["Life loss (day), 2–6 h warning", (p) => n(p.LL_D_Amp)],
-      ["Life loss (night), 0–2 h warning", (p) => n(p.LL_N_Min)],
-      ["Life loss (night), 2–6 h warning", (p) => n(p.LL_N_Amp)],
+      ["Life loss, 0–2 h warning", (p) => n(p.LL_D_Min)],
+      ["Life loss, 2–6 h warning", (p) => n(p.LL_D_Amp)],
       ["Indirect life loss", (p) => n(p.Ind_LL)],
     ];
     const planHtml = `
@@ -613,7 +609,7 @@
         <table>
           ${row("What happens", p.tier === 1 ? `Floods (${p.depth_ft} ft)` : `Loses ${p.services}`)}
           ${row("Time to failure", whenText(p.impact_h))}
-          ${a ? row("Affected buildings", n(a.buildings)) + row("Affected people (day)", n(a.pop_day)) + row("Affected people (night)", n(a.pop_night)) : ""}
+          ${a ? row("Affected buildings", n(a.buildings)) + row("Affected people", n(a.pop_day)) : ""}
         </table>`;
     }
     async function makeMap(el) {
@@ -753,7 +749,7 @@
       const opt = (v) => `<option${v === audience ? " selected" : ""}>${esc(v)}</option>`;
       const DATA = {
         threat: `From the analysis: flood arrives in ${p.Arrv_lowq}–${p.Arrv_uppq} h · typical depth ${p.Depth_lowq}–${p.Depth_uppq} ft`,
-        location: `${n(p.PAR_Day)} people (day) · ${n(p.PAR_Nght)} (night) · ${n(p.All_Struct)} buildings`,
+        location: `${n(p.PAR_Day)} people · ${n(p.All_Struct)} buildings`,
       };
       modal.innerHTML = `<form method="dialog">
         <div><h3>Draft evacuation message</h3><p class="sub">Zone ${z} · ${esc(kind)} · Evacuate when: ${EVACUATE_WHEN[z]}</p></div>

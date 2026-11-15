@@ -410,8 +410,7 @@ function facilityHtml(p) {
       ${p.area ? `<h3>Buildings &amp; people</h3>
       <table>
         <tr><td>Buildings that lose its ${p.area.service}</td><td>${n(p.area.buildings)}</td></tr>
-        <tr><td>People (day)</td><td>${n(p.area.pop_day)}</td></tr>
-        <tr><td>People (night)</td><td>${n(p.area.pop_night)}</td></tr>
+        <tr><td>People</td><td>${n(p.area.pop_day)}</td></tr>
       </table>` : ""}
       ${outLinks.length ? `<h3>Facilities</h3>
       <p class="type">${outLinks.length} ${outLinks.length === 1 ? "facility loses" : "facilities lose"} ${outLinks[0].service}${potential(outLinks[0])}</p>
@@ -433,13 +432,13 @@ function sidebarHtml() {
     <section>
     <h2>Direct impacts</h2>
     <table class="cols">
-      <thead><tr><th>Population at risk</th><th>Day</th><th>Night</th></tr></thead>
-      <tr><td>In the flood zone</td><td>${n(sum("PAR_Day"))}</td><td>${n(sum("PAR_Nght"))}</td></tr>
+      <thead><tr><th>Population at risk</th><th></th></tr></thead>
+      <tr><td>In the flood zone</td><td>${n(sum("PAR_Day"))}</td></tr>
     </table>
     <table class="cols">
-      <thead><tr><th>Life loss</th><th>Day</th><th>Night</th></tr></thead>
-      <tr><td>0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td><td>${n(sum("LL_N_Min"))}</td></tr>
-      <tr><td>2–6 h warning</td><td>${n(sum("LL_D_Amp"))}</td><td>${n(sum("LL_N_Amp"))}</td></tr>
+      <thead><tr><th>Life loss</th><th></th></tr></thead>
+      <tr><td>0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td></tr>
+      <tr><td>2–6 h warning</td><td>${n(sum("LL_D_Amp"))}</td></tr>
     </table>
     <table>
       ${row("Structures flooded", n(sum("All_Struct")))}
@@ -494,9 +493,9 @@ function impactsHtml(indirectLifeLoss) {
   return `<section class="indirect">
     <h2>Indirect impacts</h2>
     <table class="cols">
-      <thead><tr><th>Impact</th><th>People (day)</th><th>People (night)</th></tr></thead>
-      ${tiers.map(([t, i]) => `<tr><td>${swatch(i)}${IMPACT_TIERS[i].label}</td><td>${n(first(t).pop_day)}</td><td>${n(first(t).pop_night)}</td></tr>`).join("")}
-      <tr><td>All</td><td>${n(total("pop_day"))}</td><td>${n(total("pop_night"))}</td></tr>
+      <thead><tr><th>Impact</th><th>People</th></tr></thead>
+      ${tiers.map(([t, i]) => `<tr><td>${swatch(i)}${IMPACT_TIERS[i].label}</td><td>${n(first(t).pop_day)}</td></tr>`).join("")}
+      <tr><td>All</td><td>${n(total("pop_day"))}</td></tr>
     </table>
     <table class="cols expandable">
       <thead><tr><th>Impact</th><th>Buildings</th></tr></thead>
