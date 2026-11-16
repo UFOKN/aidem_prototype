@@ -38,3 +38,9 @@
 .legend .scale .ticks { position: relative; height: 14px; margin-top: 2px; font-size: 11px; color: #555; }
 .legend .scale .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .legend .scale .ticks span:last-child { transform: translateX(-30%); }
+/* Impact tiers: stacked blocks with a 7 px bar in the tier colour (tierLegend in panel.js) */
+.layer-panel .tier-legend { display: flex; flex-direction: column; gap: 1px; margin-top: 10px; }
+.layer-panel .tier-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-left: 7px solid var(--bar); font: 12px/1.25 Inter, system-ui, sans-serif; }
+.layer-panel .tier-item[hidden] { display: none; }
+.layer-panel .tier-item strong { font-weight: 700; color: #000000; }
+.layer-panel .tier-item span { color: #555555; }

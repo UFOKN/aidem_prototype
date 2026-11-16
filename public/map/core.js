@@ -118,10 +118,18 @@ const FACILITY_LAYERS = ["cascade-facilities-direct", "cascade-facilities-indire
 // water for buildings), 2 secondary (lost a service from a failed facility),
 // 3 tertiary (lost a service from a facility that failed in tier 2).
 // Buildings are shown in their first tier only.
+/** Change tier colours or labels for one page (to try a scheme on one story).
+ * Call before createMap: the map's layers read the tiers when built. */
+export function setImpactTiers(tiers) {
+  for (const [t, v] of Object.entries(tiers)) Object.assign(IMPACT_TIERS[t], v);
+}
 export const IMPACT_TIERS = {
-  1: { label: "Flooded", color: "#d81b60" },
-  2: { label: "Loss of service", color: "#f57c00" },
-  3: { label: "Indirect impact", color: "#43a047" },
+  // One warm sequence, darkest at the flood; tier 3 has an outline so its
+  // light dots hold up on the white map. Story 3 reads these too.
+  1: { label: "Flooded", color: "#bf094c" },
+  // "Indirect impacts" is the umbrella for tiers 2 and 3 (layer group, sidebar).
+  2: { label: "Loss of service", note: "Depends on flooded facility", color: "#eb5577" },
+  3: { label: "Cascading loss of service", note: "Depends on facility that lost service", color: "#f4a661", stroke: "#b46c39" },
 };
 // Colours of the failed utilities, by what they provide (legend only; the
 // cascade arrows are black).
@@ -138,10 +146,21 @@ const withAlpha = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i,
 // than the opacity, so every impact building shares one opacity and a fade
 // (fadeInIndirectBuildings) ends exactly on each one's usual look.
 const POTENTIAL_ALPHA = 0.4; // x 0.75 opacity = 0.3
-const indirectColor = ["case", ["get", "potential"],
+const indirectColor = () => ["case", ["get", "potential"],
   ["match", ["get", "tier"], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, withAlpha(v.color, POTENTIAL_ALPHA)]), withAlpha("#999999", POTENTIAL_ALPHA)],
   tierColor("tier")];
+/** Legend colour for "Potentially at risk". */
+export const potentialSwatch = () => `color-mix(in srgb, ${IMPACT_TIERS[2].color} 35%, white)`;
 const SELECTED_OPACITY = 0.9; // buildings of the selected facility
+// An optional outline per tier (IMPACT_TIERS[t].stroke, 1 px), not on
+// potential losses. Its opacity follows the dot's (setDotOpacity).
+const tierStroke = () => {
+  const withStroke = Object.entries(IMPACT_TIERS).filter(([, v]) => v.stroke);
+  return withStroke.length ? {
+    "circle-stroke-color": ["match", ["get", "tier"], ...withStroke.flatMap(([t, v]) => [+t, v.stroke]), "rgba(0,0,0,0)"],
+    "circle-stroke-width": ["case", ["boolean", ["get", "potential"], false], 0, ["match", ["get", "tier"], ...withStroke.flatMap(([t]) => [+t, 1]), 0]],
+  } : {};
+};
 // Impact buildings: hidden until their time (feature state "hidden"), faded
 // while a facility's own buildings show (feature state "dim"). k (0-1) is how
 // far the dimmed ones have faded, for the cross-fade in showAffectedBuildings.
@@ -163,7 +182,15 @@ const WATER = "#6baed6";
 const RIVER_LINE = "#2171b5";
 
 // Hours as H:MM.
-export const hm = (h) => `${Math.floor(h)}:${String(Math.floor((h % 1) * 60)).padStart(2, "0")}`;
+// Clock times. The scenario's dam breach is at 2:00 PM, so overtopping
+// (model hour 0) starts at 5:10 AM. clock() takes model hours (since
+// overtopping) and writes "5:10 AM", "2:00 PM"; use it for every time shown.
+export const BREACH_CLOCK = 14; // 2:00 PM
+export function clock(h) {
+  const m = ((Math.round((BREACH_CLOCK - BREACH_HOURS + h) * 60) % 1440) + 1440) % 1440;
+  const H = Math.floor(m / 60);
+  return `${H % 12 || 12}:${String(m % 60).padStart(2, "0")} ${H < 12 ? "AM" : "PM"}`;
+}
 export const fmt = (n) => n.toLocaleString("en-US");
 
 // ---------------------------------------------------------------------------
@@ -195,18 +222,20 @@ export function zonePopupHtml(p) {
     <table style="margin-top:8px">
       <tbody>
         <tr><th>Typical depth</th><td>${p.Depth_lowq}–${p.Depth_uppq} ft</td></tr>
-        <tr><th>Typical flood arrival</th><td>${p.Arrv_lowq}–${p.Arrv_uppq} h</td></tr>
+        <tr><th>Typical flood arrival</th><td>${arrivalClock(p.arrival)}</td></tr>
       </tbody>
     </table>
     <div class="note">Life loss is the mean for one scenario (warning time); don't add the columns. Typical = 25th–75th percentile.</div>`;
 }
 
-/** "8:50 h before the breach" / "0:54 h after the breach" / null without a time. */
-export function relativeToBreach(h) {
-  if (h == null) return null;
-  const m = Math.round(Math.abs(h) * 60); // rounded, like the story pages
-  const t = `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")} h`;
-  return h < 0 ? `${t} before the breach` : `${t} after the breach`;
+/** Typical flood arrival of a zone ({q25, q75} in model hours, zone_arrival.json) as clock times: "2:04 PM–2:46 PM". */
+export function arrivalClock(a) {
+  return a ? `${clock(a.q25)}–${clock(a.q75)}` : "";
+}
+
+/** Clock time of an impact given in hours relative to the breach ("5:10 AM"); null without a time. */
+export function impactClock(h) {
+  return h == null ? null : clock(BREACH_HOURS + h);
 }
 
 // Readable facility names: the source abbreviates some and writes most in
@@ -238,7 +267,7 @@ export function facilityPopupHtml(p, links = []) {
     ? `<tr><th>Takes out</th><td>${out.length} ${out.length === 1 ? "facility" : "facilities"} (${out[0].service})<br><span class="cause">arrows on the map</span></td></tr>`
     : "";
   const tier = IMPACT_TIERS[p.tier];
-  const when = relativeToBreach(p.impact_h);
+  const when = impactClock(p.impact_h);
   const what = p.tier === 1
     ? `Flooded, ${p.depth_ft} ft deep`
     : `Loses ${p.services}<br><span class="cause">from ${p.causes}</span>`;
@@ -323,6 +352,9 @@ export async function createMap(opts) {
     fetch(DATA + "cascade_facilities.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
     fetch(DATA + "cascade_links.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
   ]);
+  // Typical flood arrival per zone, from the flood raster (build_zone_arrival)
+  const zoneArrival = await fetch(DATA + "zone_arrival.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  for (const f of zones.features) f.properties.arrival = zoneArrival[f.properties.Zone];
   let selectedFacility = null;
   const linksOf = (name) => impactLinks.features.map((f) => f.properties).filter((l) => l.from === name || l.to === name);
   const floodedBuildings = { type: "FeatureCollection", features: impactBuildings.features.filter((f) => f.properties.tier === 1) };
@@ -517,10 +549,12 @@ export async function createMap(opts) {
           id: "cascade-buildings", type: "circle", source: "impact-buildings", filter: [">=", ["get", "tier"], 2],
           layout: { visibility: visibleAt("indirectImpacts"), "circle-sort-key": ["-", 0, ["get", "tier"]] },
           paint: {
-            "circle-color": indirectColor,
+            "circle-color": indirectColor(),
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
             // Hidden until its impact time (feature state, see syncCascadeTime)
             "circle-opacity": indirectOpacity(),
+            "circle-stroke-opacity": indirectOpacity(),
+            ...tierStroke(),
           },
         },
         {
@@ -570,6 +604,8 @@ export async function createMap(opts) {
             "circle-color": tierColor("tier"),
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1, 12, 2, 15, 4],
             "circle-opacity": SELECTED_OPACITY,
+            "circle-stroke-opacity": SELECTED_OPACITY,
+            ...tierStroke(),
           },
         },
         // Affected facilities, above the labels so they stay clickable: direct
@@ -659,7 +695,7 @@ export async function createMap(opts) {
   const TOOLTIPS = {
     depth_max: (v) => `Depth: ${v.toFixed(1)} ft`,
     velocity_max: (v) => `Velocity: ${v.toFixed(1)} ft/s`,
-    arrival_first: (v) => `Flooded: ${hm(Math.max(0, v))} h`,
+    arrival_first: (v) => `Flooded at ${clock(Math.max(0, v))}`,
   };
   const tooltip = new maplibregl.Popup({ className: "value-tip", closeButton: false, closeOnClick: false, offset: 12, anchor: "left" });
 
@@ -792,18 +828,19 @@ export async function createMap(opts) {
     async fadeInIndirectBuildings(ms = 1200) {
       const id = "cascade-buildings";
       map.setPaintProperty(id, "circle-opacity-transition", { duration: 0, delay: 0 }); // animated frame by frame
-      map.setPaintProperty(id, "circle-opacity", 0);
+      map.setPaintProperty(id, "circle-stroke-opacity-transition", { duration: 0, delay: 0 });
+      setDotOpacity(id, 0);
       map.setLayoutProperty(id, "visibility", "visible");
       const t0 = performance.now();
       await new Promise((resolve) => {
         const frame = (now) => {
           const k = Math.min(1, Math.max(0, (now - t0) / ms));
-          map.setPaintProperty(id, "circle-opacity", IMPACT_OPACITY * k);
+          setDotOpacity(id, IMPACT_OPACITY * k);
           if (k < 1) requestAnimationFrame(frame); else resolve();
         };
         requestAnimationFrame(frame);
       });
-      map.setPaintProperty(id, "circle-opacity", indirectOpacity(dimFade));
+      setDotOpacity(id, indirectOpacity(dimFade));
     },
 
     /** Turn the reader's map controls (pan, zoom, rotate) on or off. */
@@ -956,6 +993,11 @@ export async function createMap(opts) {
   // Buildings that lose a service from any of the named facilities: one file
   // per provider (data/cascade_by_provider), loaded on demand and merged. The
   // other impact buildings fade (feature state "dim") meanwhile.
+  // Dot opacity, fill and outline together.
+  const setDotOpacity = (id, v) => {
+    map.setPaintProperty(id, "circle-opacity", v);
+    map.setPaintProperty(id, "circle-stroke-opacity", v);
+  };
   let affectedSeq = 0;
   let affectedNames = [];
   let dimFade = 1; // how far the cross-fade has got (1: the layers' own styling)
@@ -976,19 +1018,20 @@ export async function createMap(opts) {
       // Otherwise the other layers only when they change, so a selection
       // doesn't cut into fadeInIndirectBuildings.
       if (k !== 1) {
-        map.setPaintProperty("cascade-buildings", "circle-opacity", towardsDim(IMPACT_OPACITY, k));
+        setDotOpacity("cascade-buildings", towardsDim(IMPACT_OPACITY, k));
         map.setPaintProperty("cascade-flooded", "circle-opacity", towardsDim(IMPACT_OPACITY, k));
       } else if (dimFade !== 1) {
-        map.setPaintProperty("cascade-buildings", "circle-opacity", indirectOpacity());
+        setDotOpacity("cascade-buildings", indirectOpacity());
         map.setPaintProperty("cascade-flooded", "circle-opacity", floodedOpacity());
       }
       // The facility's own buildings come up faster than the others go down,
       // so the dots both layers share never get lighter on the way.
-      map.setPaintProperty("cascade-selected-buildings", "circle-opacity", SELECTED_OPACITY * Math.min(1, 2.5 * k));
+      setDotOpacity("cascade-selected-buildings", SELECTED_OPACITY * Math.min(1, 2.5 * k));
       dimFade = k;
     };
     for (const id of ["cascade-buildings", "cascade-flooded", "cascade-selected-buildings"]) {
       map.setPaintProperty(id, "circle-opacity-transition", { duration: 0, delay: 0 }); // animated frame by frame
+      map.setPaintProperty(id, "circle-stroke-opacity-transition", { duration: 0, delay: 0 });
     }
     setFade(crossFade ? 0 : 1);
     for (const [source, data] of [["impact-buildings", impactBuildings], ["impact-flooded", floodedBuildings]]) {

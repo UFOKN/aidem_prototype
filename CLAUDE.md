@@ -37,7 +37,9 @@ File `FTpE5i6BheiMWE7zVX7N6f`, page "Prototype". Story frames sit in rows around
 ## Data notes
 
 - Two sources count flooded buildings differently. LifeSim (USACE, per evacuation zone): 2,422 buildings, 13,246 people by day and 5,794 at night. The cascade analysis (per building, `../data/johnstown_cascade/output`): 2,587 buildings, including every building the water reaches. Story 3 shows both, with a note.
-- Nearly all indirect impacts have their first impact at 0:00 on the slider (overtopping start), because the main providers fail then. So the indirect layer barely changes over time. That comes from the data, not a bug.
+- Times are shown as clock times ("5:10 AM", "2:00 PM"), from `clock()` in `map/core.js`: the dam breach (model hour 8.83) is at 2:00 PM, so overtopping (model hour 0) starts at 5:10 AM. Model code keeps hours since overtopping; impact times in the data are hours relative to the breach (`impactClock()`). Warning lead times ("0–2 h warning") stay durations. "Typical flood arrival" per zone comes from the flood raster (`zone_arrival.json`, `build_zone_arrival` in the build script), not LifeSim's `Arrv_lowq`/`Arrv_uppq`: those don't say what they count from and match the raster neither way.
+- Nearly all indirect impacts have their first impact at 5:10 AM on the slider (overtopping start), because the main providers fail then. So the indirect layer barely changes over time. That comes from the data, not a bug.
+- Impact tier colours (flooded `#bf094c`, loss of service `#eb5577`, indirect impact `#f4a661` with a 1 px `#b46c39` outline) live only in `IMPACT_TIERS` in `map/core.js`; stories 1 and 3, the legends and the map layers all read them, so a tweak there changes everything. "Potentially at risk" is drawn as a pale version of the tier colour. Figma swatches are set by hand to match.
 - "Potentially at risk" means buildings and facilities that depend on drinking-water systems whose intakes aren't public. The map counts 2,002 buildings in that category. People figures for that category alone aren't built yet.
 - Write "People (day)" and "People (night)", never "People, day".
 

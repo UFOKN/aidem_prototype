@@ -297,7 +297,7 @@
     </nav>
   </div>
   <script type="module">
-    import { createMap, hm } from "../../map/core.js";
+    import { createMap, clock, arrivalClock, BREACH_HOURS, IMPACT_TIERS } from "../../map/core.js";
     import { legend } from "../../map/panel.js";
 
     // --- Data --------------------------------------------------------------------
@@ -305,6 +305,9 @@
     // zones) and the cascading impacts (../data/johnstown_cascade).
     const ZONE_COLORS = { 1: "#d7301f", 2: "#fc8d59", 3: "#fdcc8a" };
     const zoneFeatures = (await (await fetch("../../data/evacuation_zones.geojson")).json()).features;
+    // Typical flood arrival per zone, from the flood raster (as in map/core.js)
+    const zoneArrival = await fetch("../../data/zone_arrival.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    for (const f of zoneFeatures) f.properties.arrival = zoneArrival[f.properties.Zone];
     const zones = zoneFeatures.map((f) => f.properties).sort((a, b) => a.Zone - b.Zone);
     const getJson = (f) => fetch(`../../data/${f}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const [impacts, areas, facilities] = await Promise.all(
@@ -312,13 +315,13 @@
     const severity = await getJson("cascade_flooded_severity.json"); // people in flooded buildings by flood severity
     const byUse = await getJson("cascade_flooded_use.json"); // flooded buildings by use (homes, businesses, ...)
     const useByTier = await getJson("cascade_use_by_tier.json"); // buildings by use in each first tier (primary, secondary, tertiary)
-    const TIER_COLORS = { primary: "#d81b60", secondary: "#f57c00", tertiary: "#43a047" }; // IMPACT_TIERS in map/core.js
+    const TIER = { primary: IMPACT_TIERS[1], secondary: IMPACT_TIERS[2], tertiary: IMPACT_TIERS[3] }; // colours from map/core.js
+    const tierSwatch = (t) => `<i style="background:${TIER[t].color}${TIER[t].stroke ? `; box-shadow: inset 0 0 0 1px ${TIER[t].stroke}` : ""}"></i>`;
     const sum = (k) => zones.reduce((a, p) => a + p[k], 0);
     const n = (v) => Math.round(v).toLocaleString("en-US");
     const about = (v, step) => n(Math.round(v / step) * step);
     const zone = (p) => `<i style="background:${ZONE_COLORS[p.Zone]}"></i>Zone ${p.Zone}`;
-    const hmAbs = (h) => `${Math.floor(Math.abs(h))}:${String(Math.round((Math.abs(h) % 1) * 60)).padStart(2, "0")} h`;
-    const whenText = (h) => (h == null ? "Potentially at risk" : `${hmAbs(h)} ${h < 0 ? "before" : "after"} failure`);
+    const whenText = (h) => (h == null ? "Potentially at risk" : clock(BREACH_HOURS + h)); // h: hours relative to the breach
     const utilities = areas ? areas.features.map((f) => f.properties).filter((p) => p.utility)
       .sort((a, b) => (a.offline_h ?? 99) - (b.offline_h ?? 99) || b.buildings - a.buildings) : [];
     const TYPES = {
@@ -365,7 +368,7 @@
     // (no time) last. The type is a small label under the facility's name.
     const byTime = (rows) => [...rows].sort((a, b) => (a.h ?? Infinity) - (b.h ?? Infinity));
     const impactTable = (rows) => `<table class="impacts">
-          <tr><th style="width:36%">Facility</th><th style="width:20%">What happens</th><th style="width:15%">Time to failure</th><th>Affected buildings</th><th>Affected people</th></tr>
+          <tr><th style="width:36%">Facility</th><th style="width:20%">Impact</th><th style="width:15%">Time of impact</th><th>Affected buildings</th><th>Affected people</th></tr>
           ${byTime(rows).map((r) => `<tr><td>${r.name}<span class="type">${r.type}</span></td><td>${cell(r.what)}</td><td>${cell(r.when)}</td><td>${cell(r.b)}</td><td>${cell(r.d)}</td></tr>`).join("")}
         </table>`;
     const utilRow = (p) => {
@@ -406,13 +409,13 @@
       </table>`;
     const floodHtml = `
       <section>
-        <h3 class="q">How deep will the water get?</h3>
-        <div class="live-map" data-map="depth"></div>
-      </section>
-      <section>
         <h3 class="q">How soon will the water get here?</h3>
         <p class="intro">When the water reaches each place, and so how much time people there have to get out.</p>
         <div class="live-map" data-map="advance"></div>
+      </section>
+      <section>
+        <h3 class="q">How deep will the water get?</h3>
+        <div class="live-map" data-map="depth"></div>
       </section>
       <section>
         <h3 class="q">Where is the flood most dangerous?</h3>
@@ -440,7 +443,7 @@
           ${[["primary", "Flooded"], ["secondary", "Lose a service"], ["tertiary", "Depends on facility that loses service"]].map(([t, label]) => {
             const uses = useByTier?.[t] ?? (t === "primary" ? byUse : null);
             const toggle = uses ? `<button class="expand" aria-expanded="false" aria-label="Show buildings by use"></button>` : "";
-            return `<tr data-tier="${t}"><td>${toggle}<i style="background:${TIER_COLORS[t]}"></i>${label}</td><td>${n(first(t).count)}</td><td>${n(first(t).pop_day)}</td></tr>`
+            return `<tr data-tier="${t}"><td>${toggle}${tierSwatch(t)}${label}</td><td>${n(first(t).count)}</td><td>${n(first(t).pop_day)}</td></tr>`
               + (uses ?? []).map((r) => `<tr class="use" data-tier="${t}" hidden><td>${r.use}</td><td>${n(r.buildings)}</td><td>${n(r.pop_day)}</td></tr>`).join("");
           }).join("")}
           <tr class="total"><td>All</td>${["count", "pop_day"].map((k) => `<td>${n(["primary", "secondary", "tertiary"].reduce((a, t) => a + first(t)[k], 0))}</td>`).join("")}</tr>
@@ -483,7 +486,7 @@
     // Zones as columns, figures as rows (LifeSim results per zone).
     const ZONE_ROWS = [
       ["People", (p) => n(p.PAR_Day)],
-      ["Typical flood arrival", (p) => `${p.Arrv_lowq}–${p.Arrv_uppq} h`],
+      ["Typical flood arrival", (p) => arrivalClock(p.arrival)],
       ["Typical depth", (p) => `${p.Depth_lowq}–${p.Depth_uppq} ft`],
       ["Buildings flooded", (p) => n(p.All_Struct)],
       ["Critical facilities", (p) => n(p.Crt_Struct)],
@@ -585,16 +588,15 @@
     // --- Live maps, made when they scroll into view ------------------------------
     const liveMaps = [];
     const EM_PITCH = 25; // story 1, step 4 (JOHNSTOWN.pitch)
-    const IMPACT_LEGEND = [["Flooded", "#d81b60"], ["Loss of service", "#f57c00"], ["Indirect impact", "#43a047"], ["Potentially at risk", "#fbd1a6"]]
-      .map(([l, c]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
+    const IMPACT_LEGEND = legend("impacts"); // tier colours from map/core.js
     window.liveMaps = liveMaps; // for debugging and Figma captures
     const MAPS = {
       depth: { title: "Maximum flood depth in ft", flood: "depth_max", layers: { directImpacts: true }, legend: ["depth", "flooded"], fit: "zones" },
-      advance: { title: "Flooded area over time, in hours since overtopping starts", flood: "arrival_first", layers: { directImpacts: true }, legend: ["advance", "flooded-advance"], clock: true, fit: "zones" },
+      advance: { title: "Flooded area over time", flood: "arrival_first", layers: { directImpacts: true }, legend: ["advance", "flooded-advance"], clock: true, fit: "zones" },
       velocity: { title: "Maximum water velocity in the flood area", flood: "velocity_max", legend: "velocity", fit: "zones" },
       // Impacts follow the flood timeline; no value tooltip on this map.
       // Clicking a facility shows its cascade and its figures under the legend (no popup).
-      county: { title: "Flooded area over time, in hours since overtopping starts", flood: "arrival_first", layers: { directImpacts: true, indirectImpacts: true }, legend: ["advance", "impacts"], clock: true, tooltips: false, facilityClick: true, fit: "impacts" },
+      county: { title: "Flooded area over time", flood: "arrival_first", layers: { directImpacts: true, indirectImpacts: true }, legend: ["advance", "impacts"], clock: true, tooltips: false, facilityClick: true, fit: "impacts" },
       zones: { flood: null, layers: { evac: true }, legend: "zones", zonePopup: true, fit: "zones" },
     };
     // A clicked facility's figures, as in the facility tables.
@@ -607,8 +609,8 @@
       return `<button class="close" aria-label="Close" title="Close">×</button>
         <p class="name">${titleCase(p.name)}</p><p class="type">${type}${p.certainty === "potential" ? " · potentially at risk" : ""}</p>
         <table>
-          ${row("What happens", p.tier === 1 ? `Floods (${p.depth_ft} ft)` : `Loses ${p.services}`)}
-          ${row("Time to failure", whenText(p.impact_h))}
+          ${row("Impact", p.tier === 1 ? `Floods (${p.depth_ft} ft)` : `Loses ${p.services}`)}
+          ${row("Time of impact", whenText(p.impact_h))}
           ${a ? row("Affected buildings", n(a.buildings)) + row("Affected people", n(a.pop_day)) : ""}
         </table>`;
     }
@@ -631,7 +633,7 @@
       app.map.setPitch(EM_PITCH);
       const ui = document.createElement("div");
       ui.className = "map-legend";
-      ui.innerHTML = (cfg.title ? `<p class="legend-title">${cfg.title}</p>` : "") + (cfg.clock ? `<div class="clock"><button class="play" title="Play / pause">▶</button><strong class="clock-time"></strong> h</div>
+      ui.innerHTML = (cfg.title ? `<p class="legend-title">${cfg.title}</p>` : "") + (cfg.clock ? `<div class="clock"><button class="play" title="Play / pause">▶</button><strong class="clock-time"></strong></div>
         <input class="time" type="range" min="0" max="${app.maxHours}" step="0.01">` : "")
         + [cfg.legend].flat().map((k) => `<div class="legend">${k === "impacts" ? IMPACT_LEGEND : legend(k)}</div>`).join("");
       el.append(ui);
@@ -649,7 +651,7 @@
       }
       if (cfg.clock) {
         const slider = ui.querySelector(".time"), play = ui.querySelector(".play");
-        const sync = (t) => { slider.value = t; ui.querySelector(".clock-time").textContent = hm(t); };
+        const sync = (t) => { slider.value = t; ui.querySelector(".clock-time").textContent = clock(t); };
         app.on("time", sync);
         app.on("play", (on) => (play.textContent = on ? "❚❚" : "▶"));
         slider.addEventListener("input", () => { app.pause(); app.setTime(+slider.value); });
@@ -748,7 +750,7 @@
       const kind = cardEl ? cardEl.querySelector(".title").textContent : "New notice";
       const opt = (v) => `<option${v === audience ? " selected" : ""}>${esc(v)}</option>`;
       const DATA = {
-        threat: `From the analysis: flood arrives in ${p.Arrv_lowq}–${p.Arrv_uppq} h · typical depth ${p.Depth_lowq}–${p.Depth_uppq} ft`,
+        threat: `From the analysis: flood arrives ${arrivalClock(p.arrival)} · typical depth ${p.Depth_lowq}–${p.Depth_uppq} ft`,
         location: `${n(p.PAR_Day)} people · ${n(p.All_Struct)} buildings`,
       };
       modal.innerHTML = `<form method="dialog">
@@ -839,7 +841,7 @@
     const STORY_1 = "../story-1/";
     const card = document.querySelector(".card"), next = card.querySelector(".next"), prev = card.querySelector(".prev");
     const STEPS = [
-      { text: ["USACE has great data, but no authority to warn the public.", "Local emergency managers have that authority, but most aren’t trained to interpret flood data and have few resources for flood planning.", "With AidEM, emergency managers get an accessible summary of the potential flood."], next: "Add local context →" },
+      { text: ["USACE has great data, but no authority to warn the public.", "Local emergency managers have that authority, but most aren’t trained to interpret flood data and have few resources for disaster planning and mitigation.", "With AidEM, emergency managers get an accessible summary of the potential flood."], next: "Add local context →" },
       { text: ["EMs can add local context, such as their county Emergency Action Plan."], next: "Upload Cambria County EAP →" },
       { text: ["Today, flood warnings often arrive late or are too vague to act on.", "With AidEM, officials draft effective evacuation notices by incorporating actionable data and FEMA best practices."], next: "Next" },
       { text: ["Floods are becoming more frequent and many U.S. dams are aging. ", "AidEM helps agencies prepare the public — with state-of-the-art flood mapping presented in an accessible way for all stakeholders. And with effective evacuation notices that enable residents to act.", { note: "May disasters like the Johnstown Flood never repeat." }], next: "Start over", startOver: false },

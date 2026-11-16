@@ -1,7 +1,7 @@
 // Story 1, wireframe stage. Text and frames from Figma (AidEM, Section 1,
 // node 12:408). The current step is kept in the URL hash (#2).
 
-import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, relativeToBreach, facilityName } from "../../map/core.js";
+import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, clock, facilityName } from "../../map/core.js";
 import { createPanel } from "../../map/panel.js";
 
 // Opening view on the South Fork Dam (from the explorer's URL
@@ -384,7 +384,7 @@ function renderDetail() {
 function facilityHtml(p) {
   const n = (v) => Math.round(v).toLocaleString("en-US");
   const tier = IMPACT_TIERS[p.tier];
-  const when = relativeToBreach(p.impact_h);
+  const when = impactClock(p.impact_h);
   const potential = (l) => (l.certainty === "potential" ? ` <span class="na">(potentially at risk${l.located ? "" : ", location not public"})</span>` : "");
   const inLinks = p.links.filter((l) => l.to === p.name), outLinks = p.links.filter((l) => l.from === p.name);
   const status = p.tier === 1 ? `Flooded, ${p.depth_ft} ft deep` : `Loses ${p.services}`;
@@ -423,7 +423,6 @@ function sidebarHtml() {
   const z = [1, 2, 3].map((n) => app.zoneStats(n));
   const sum = (k) => z.reduce((a, p) => a + p[k], 0);
   const n = (v) => Math.round(v).toLocaleString("en-US");
-  const hm = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, "0")} h`;
   const collapse = z.reduce((a, p) => a + (p.All_Struct * p.All_Collps) / 100, 0);
   const row = (label, value, cls = "") => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
   const swatch = (zone) => `<i style="background:${ZONES[zone].color}"></i>`;
@@ -451,8 +450,8 @@ function sidebarHtml() {
     <section>
     <h2>Flood modeling</h2>
     <table>
-      ${row("Overtopping starts", "0:00 h")}
-      ${row("Dam breach", hm(BREACH_HOURS))}
+      ${row("Overtopping starts", clock(0))}
+      ${row("Dam breach", clock(BREACH_HOURS))}
       ${row("Flooded area", `${f.areaSqMi} sq mi`)}
       ${row("Depth", `up to ${f.maxDepth} ft, median ${f.medianDepth} ft`)}
       ${row("Velocity", `up to ${f.velocityP99} ft/s`)}
@@ -489,7 +488,7 @@ function impactsHtml(indirectLifeLoss) {
   // Flooded buildings are listed with the direct impacts.
   const tiers = [["secondary", 2], ["tertiary", 3]];
   const total = (k) => tiers.reduce((a, [t]) => a + first(t)[k], 0);
-  const swatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}"></i>`;
+  const swatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}${IMPACT_TIERS[i].stroke ? `; box-shadow: inset 0 0 0 1px ${IMPACT_TIERS[i].stroke}` : ""}"></i>`;
   return `<section class="indirect">
     <h2>Indirect impacts</h2>
     <table class="cols">

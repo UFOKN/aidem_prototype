@@ -1107,6 +1107,27 @@ def build_raster(cfg: dict, force: bool) -> dict:
     return layer
 
 
+def build_zone_arrival() -> None:
+    """Typical flood arrival per evacuation zone (25th and 75th percentile of
+    the flood raster's first arrival inside the zone, hours since overtopping),
+    for the zone table and popup. LifeSim's own Arrv_lowq/uppq don't say what
+    they count from and don't match the raster, so the pages use these."""
+    import rasterio.mask
+    from shapely.geometry import mapping, shape
+    from shapely.ops import transform
+    zones = json.loads((OUT / "evacuation_zones.geojson").read_text())["features"]
+    out = {}
+    with rasterio.open(CACHE / "arrival_first_3857.tif") as src:
+        to_src = Transformer.from_crs(4326, src.crs, always_xy=True).transform
+        for f in zones:
+            a, _ = rasterio.mask.mask(src, [mapping(transform(to_src, shape(f["geometry"])))], crop=True, filled=False)
+            v = a.compressed()
+            v = v[(v >= 0) & (v < 100)]  # 200 is NoData (see DEM_ENCODING)
+            out[str(f["properties"]["Zone"])] = {"q25": round(float(np.percentile(v, 25)), 2), "q75": round(float(np.percentile(v, 75)), 2)}
+    (OUT / "zone_arrival.json").write_text(json.dumps(out, indent=1))
+    log(f"zones: wrote zone_arrival.json ({out})")
+
+
 def build_rasters(force: bool) -> dict:
     layers = {cfg["id"]: build_raster(cfg, force) for cfg in RASTERS}
     (OUT / "rasters.json").write_text(json.dumps(layers, indent=2) + "\n")
@@ -1122,6 +1143,7 @@ def main() -> None:
     build_evacuation_zones()
     build_cascade()
     layers =build_rasters(force=args.force)
+    build_zone_arrival()
     # Basemap, buildings and coarse terrain cover the flood extent plus
     # DATA_PADDING (the map itself is limited to the flood extent plus 10%,
     # see map/core.js; the extra margin fills the horizon in tilted views).
