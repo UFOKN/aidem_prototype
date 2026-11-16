@@ -198,9 +198,8 @@
     #notices { scroll-margin-top: calc(var(--toolbar-height) + 24px); }
     .notice-zone { padding: 40px 0; border-top: 1px solid #e3e3e3; }
     .plan h3.q + .notice-zone { border-top: 0; padding-top: 24px; }
-    .notice-zone h4 { margin: 0; font-size: 18px; font-weight: 600; }
+    .notice-zone h4 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
     .notice-zone h4 i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 10px; }
-    .notice-zone .when { margin: 4px 0 16px; color: #555555; font-size: 15px; }
     .notices { display: flex; flex-direction: column; gap: 12px; }
     .notices:not(:empty) { margin-bottom: 12px; }
     /* Notice colours by kind: evacuation orders red, notifications orange */
@@ -297,13 +296,12 @@
     </nav>
   </div>
   <script type="module">
-    import { createMap, clock, arrivalClock, BREACH_HOURS, IMPACT_TIERS } from "../../map/core.js";
+    import { createMap, clock, arrivalClock, BREACH_HOURS, IMPACT_TIERS, ZONES, facilityName } from "../../map/core.js";
     import { legend } from "../../map/panel.js";
 
     // --- Data --------------------------------------------------------------------
     // Figures from the evacuation zones (LifeSim results, summed over the
     // zones) and the cascading impacts (../data/johnstown_cascade).
-    const ZONE_COLORS = { 1: "#d7301f", 2: "#fc8d59", 3: "#fdcc8a" };
     const zoneFeatures = (await (await fetch("../../data/evacuation_zones.geojson")).json()).features;
     // Typical flood arrival per zone, from the flood raster (as in map/core.js)
     const zoneArrival = await fetch("../../data/zone_arrival.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
@@ -320,52 +318,25 @@
     const sum = (k) => zones.reduce((a, p) => a + p[k], 0);
     const n = (v) => Math.round(v).toLocaleString("en-US");
     const about = (v, step) => n(Math.round(v / step) * step);
-    const zone = (p) => `<i style="background:${ZONE_COLORS[p.Zone]}"></i>Zone ${p.Zone}`;
-    const whenText = (h) => (h == null ? "Potentially at risk" : clock(BREACH_HOURS + h)); // h: hours relative to the breach
+    const zone = (p) => `<i style="background:${ZONES[p.Zone]?.color ?? "#999"}"></i>Zone ${p.Zone}`;
+    const whenText = (h) => (h == null ? "" : clock(BREACH_HOURS + h)); // h: hours relative to the breach
     const utilities = areas ? areas.features.map((f) => f.properties).filter((p) => p.utility)
       .sort((a, b) => (a.offline_h ?? 99) - (b.offline_h ?? 99) || b.buildings - a.buildings) : [];
-    const TYPES = {
-      Hospitals: "Hospital", Schools: "School", "Colleges and Universities": "College", "Correctional Facilities": "Prison",
-      EMS: "Ambulance", "Fire Stations": "Fire station", "Law Enforcement": "Police", Heliports: "Helipad", "Broadcast Communication": "Radio station", "Intermodal Terminal Facilities": "Transit terminal",
-    };
-    const EMERGENCY = ["Hospitals", "EMS", "Fire Stations", "Fire Stations EMS", "Law Enforcement", "Heliports", "Broadcast Communication"];
+    // Facility types in the cascade (round 3: schools, hospitals and power).
+    const TYPES = { Hospitals: "Hospital", Schools: "School", "Electric Power Generation": "Power plant", "Electric Substations": "Substation" };
     const facilityProps = (facilities?.features ?? []).map((f) => f.properties);
-    // The source lists some stations twice (as EMS and as Fire Stations EMS): one row each, types joined.
-    const facilityRows = (list, order) => {
-      const rows = [];
-      for (const p of [...list].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || a.name.localeCompare(b.name))) {
-        const same = rows.find((q) => q.name === p.name);
-        if (same) same.types.push(p.type);
-        else rows.push({ ...p, types: [p.type] });
-      }
-      return rows.map((p) => ({ ...p, type: p.types.includes("Fire Stations EMS") ? "Fire and ambulance" : p.types.map((t) => TYPES[t] ?? t).join(", ") }));
-    };
+    const facilityRows = (list) => [...list].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ ...p, type: TYPES[p.type] ?? p.type }));
     const first = (t) => impacts.buildings[t].first_affected;
-    const NAMES = {
-      "DORNICK PT WWTP": "Dornick Point sewage plant",
-      "GREATER JOHNSTOWN WA RIVERSIDE": "Greater Johnstown Water Authority (Riverside)",
-      "HIGHLAND S & W AUTH BEAVERDAM": "Highland Sewer & Water Authority (Beaverdam)",
-      "SOUTHWESTERN CAMBRIA CNTY AUTH": "Southwestern Cambria County Authority",
-      "EAST TAYLOR MUNI AUTH": "East Taylor Municipal Authority",
-      "WCRO": "WCRO radio",
-      "WLKJ-FM1": "WLKJ radio",
-      "FOREST HILLS JSHS": "Forest Hills Junior/Senior High School",
-      "GREATER JOHNSTOWN SHS": "Greater Johnstown Senior High School",
-      "GREATER JOHNSTOWN SCHOOL DISTRICT'S CYBE": "Greater Johnstown School District cyber school",
-      "JOHNSTOWN CCC": "Johnstown Community Corrections Center",
-    };
-    const titleCase = (s) => NAMES[s] ?? (s === s.toUpperCase() ? s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()) : s);
-    const allRows = (types) => facilityRows(facilityProps.filter((p) => types.includes(p.type)), types);
+    const titleCase = facilityName; // readable names, shared with story 1 (map/core.js)
+    const allRows = (types) => facilityRows(facilityProps.filter((p) => types.includes(p.type)));
     const hospitals = allRows(["Hospitals"]);
-    const emergency = allRows(EMERGENCY.filter((t) => t !== "Hospitals"));
-    const water = utilities.filter((p) => p.kind === "Wastewater Treatment Plants" || p.kind === "Public Water System");
-    const power = utilities.filter((p) => p.kind === "Gas-Fired Power Plant" || p.kind === "Electric Substations");
+    const schools = allRows(["Schools"]);
+    const power = utilities.filter((p) => p.kind === "Electric Power Generation" || p.kind === "Electric Substations");
     const areaOf = (name) => areas?.features.find((f) => f.properties.name === name)?.properties;
     const facOf = (name) => facilityProps.find((p) => p.name === name);
-    const UTIL_TYPE = { "Wastewater Treatment Plants": "Sewage plant", "Public Water System": "Water system", "Gas-Fired Power Plant": "Power plant", "Electric Substations": "Substation" };
     const cell = (v) => v ?? "";
-    // Sorted by time to failure, the first to fail on top; "potentially at risk"
-    // (no time) last. The type is a small label under the facility's name.
+    // Sorted by time of impact, the first on top (any without a time last).
+    // The type is a small label under the facility's name.
     const byTime = (rows) => [...rows].sort((a, b) => (a.h ?? Infinity) - (b.h ?? Infinity));
     const impactTable = (rows) => `<table class="impacts">
           <tr><th style="width:36%">Facility</th><th style="width:20%">Impact</th><th style="width:15%">Time of impact</th><th>Affected buildings</th><th>Affected people</th></tr>
@@ -373,8 +344,8 @@
         </table>`;
     const utilRow = (p) => {
       const f = facOf(p.name);
-      return { name: titleCase(p.name), type: UTIL_TYPE[p.kind] ?? p.kind,
-        what: f?.tier === 1 ? `Floods (${f.depth_ft} ft)` : p.kind === "Public Water System" ? "Flood enters its service area" : null,
+      return { name: titleCase(p.name), type: TYPES[p.kind] ?? p.kind,
+        what: f?.tier === 1 ? `Floods (${f.depth_ft} ft)` : null,
         h: p.offline_h, when: whenText(p.offline_h), b: n(p.buildings), d: n(p.pop_day) };
     };
     const facRow = (p) => {
@@ -399,7 +370,7 @@
     const summaryHtml = `
       <section>
         <h2>Summary</h2>
-        <p class="lead">If South Fork Dam fails during the day, about ${about(sum("PAR_Day"), 100)} people are directly in the flood’s path.${impacts ? ` Another ${about(first("secondary").pop_day + first("tertiary").pop_day, 1000)} lose a service such as power, sewer or hospital care, because a facility they rely on fails.` : ""} ${n(sum("All_Struct"))} buildings are in the flood zone, ${n(sum("Crt_Struct"))} of them critical facilities. With little warning, a daytime failure could cost around ${about(sum("LL_D_Min"), 100)} lives.</p>
+        <p class="lead">If South Fork Dam fails during the day, about ${about(sum("PAR_Day"), 100)} people are directly in the flood’s path.${impacts ? ` Another ${about(first("secondary").pop_day + first("tertiary").pop_day, 1000)} lose power, schooling or hospital care, because a facility they rely on fails.` : ""} ${n(sum("All_Struct"))} buildings are in the flood zone, ${n(sum("Crt_Struct"))} of them critical facilities. With little warning, a daytime failure could cost around ${about(sum("LL_D_Min"), 100)} lives.</p>
       </section>`;
     const zoneTable = `
       <table class="num zone-table">
@@ -450,27 +421,25 @@
         </table>
         <div class="live-map" data-map="county" style="margin-top:24px; height:708px"></div>
         <h3>Which facilities are affected?</h3>
-        <h4>Water infrastructure</h4>
-        ${impactTable(water.map(utilRow))}
         <h4>Power infrastructure</h4>
         ${impactTable(power.map(utilRow))}
         <h4>Hospitals</h4>
         ${impactTable(hospitals.map(facRow))}
-        <h4>Emergency services</h4>
-        ${impactTable(emergency.map(facRow))}
+        <h4>Schools</h4>
+        ${impactTable(schools.map(facRow))}
       </section>` : `<p class="intro">The cascading impacts didn’t load.</p>`;
     // Pre-drafted notices: title, text, kind and, if drafted in parts, the
     // five parts of the message (see PARTS); the text is the parts joined.
     const ZONE_1_ORDER = {
       source: "Cambria County Emergency Mgmt.",
-      threat: "South Fork Dam may fail. Water up to 16 feet deep could reach your area within 2 hours.",
+      threat: "South Fork Dam may fail. Water up to 17 feet deep could reach your area within 2 hours.",
       location: "",
       guidance: "Evacuate now. Go uphill, away from the river. Take medication, pets and documents. Do not drive through water.",
       expiration: "",
     };
     const ZONE_2_NOTIFICATION = {
       source: "Cambria County Emergency Mgmt.",
-      threat: "Your area may lose power or water in the next 1-2 hours.",
+      threat: "Your area may lose power in the next 1-2 hours.",
       location: "",
       guidance: "Prepare to evacuate if necessary.",
       expiration: "",
@@ -479,9 +448,7 @@
     const NOTICES = {
       1: [["Evacuation order", joinParts(ZONE_1_ORDER), "order", ZONE_1_ORDER]],
       2: [["Notification of impending impact", joinParts(ZONE_2_NOTIFICATION), "notification", ZONE_2_NOTIFICATION]],
-      3: [],
     };
-    const EVACUATE_WHEN = { 1: "water is forecast to spill over the dam", 2: "USACE warns the dam may not hold", 3: "shortly before the dam fails" };
     const noticeCard = (title, body, kind = "", parts = null) => `<div class="notice ${kind}"${parts ? ` data-parts="${JSON.stringify(parts).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"` : ""}><div class="notice-head"><h5 class="title">${title}</h5><button class="edit">Edit</button></div><p class="body">${body}</p></div>`;
     // Zones as columns, figures as rows (LifeSim results per zone).
     const ZONE_ROWS = [
@@ -490,7 +457,7 @@
       ["Typical depth", (p) => `${p.Depth_lowq}–${p.Depth_uppq} ft`],
       ["Buildings flooded", (p) => n(p.All_Struct)],
       ["Critical facilities", (p) => n(p.Crt_Struct)],
-      ["Likely to collapse", (p) => `${p.All_Collps}%`],
+      ["Likely to collapse", (p) => n(p.All_Collps)],
       ["Life loss, 0–2 h warning", (p) => n(p.LL_D_Min)],
       ["Life loss, 2–6 h warning", (p) => n(p.LL_D_Amp)],
       ["Indirect life loss", (p) => n(p.Ind_LL)],
@@ -508,7 +475,6 @@
         <h3 class="q">Notify the public</h3>
         ${zones.map((p) => `<div class="notice-zone" data-zone="${p.Zone}">
           <h4>${zone(p)}</h4>
-          <p class="when">Evacuate when: ${EVACUATE_WHEN[p.Zone]}</p>
           <div class="notices">${NOTICES[p.Zone].map(([t, b, k, parts]) => noticeCard(t, b, k, parts)).join("")}</div>
           <div class="add-notice"><button class="new-notice">Add notice</button></div>
         </div>`).join("")}
@@ -602,12 +568,10 @@
     // A clicked facility's figures, as in the facility tables.
     function facilityPanelHtml(p) {
       const a = p.area;
-      // Stations listed twice in the source (EMS and Fire Stations EMS) read as in the tables.
-      const types = facilityProps.filter((q) => q.name === p.name).map((q) => q.type);
-      const type = types.includes("Fire Stations EMS") ? "Fire and ambulance" : TYPES[p.type] ?? UTIL_TYPE[p.type] ?? p.type;
+      const type = TYPES[p.type] ?? p.type;
       const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
       return `<button class="close" aria-label="Close" title="Close">×</button>
-        <p class="name">${titleCase(p.name)}</p><p class="type">${type}${p.certainty === "potential" ? " · potentially at risk" : ""}</p>
+        <p class="name">${titleCase(p.name)}</p><p class="type">${type}</p>
         <table>
           ${row("Impact", p.tier === 1 ? `Floods (${p.depth_ft} ft)` : `Loses ${p.services}`)}
           ${row("Time of impact", whenText(p.impact_h))}
@@ -684,12 +648,8 @@
       const zf = zoneFeatures.find((f) => f.properties.Zone === z);
       const list = (facilities?.features ?? []).filter((f) => zf && inZone(f.geometry.coordinates, zf));
       const groups = {};
-      // The source lists some stations twice (EMS and Fire Stations EMS): one entry each.
       const typeOf = {};
-      for (const f of list) {
-        const name = titleCase(f.properties.name), t = f.properties.type;
-        typeOf[name] = t === "Fire Stations EMS" || (typeOf[name] && typeOf[name] !== t) ? "Fire and ambulance" : TYPES[t] ?? UTIL_TYPE[t] ?? t;
-      }
+      for (const f of list) typeOf[titleCase(f.properties.name)] = TYPES[f.properties.type] ?? f.properties.type;
       for (const [name, type] of Object.entries(typeOf)) (groups[type] ??= new Set()).add(name);
       return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([type, names]) => [type, [...names].sort()]);
     };
@@ -754,7 +714,7 @@
         location: `${n(p.PAR_Day)} people · ${n(p.All_Struct)} buildings`,
       };
       modal.innerHTML = `<form method="dialog">
-        <div><h3>Draft evacuation message</h3><p class="sub">Zone ${z} · ${esc(kind)} · Evacuate when: ${EVACUATE_WHEN[z]}</p></div>
+        <div><h3>Draft evacuation message</h3><p class="sub">Zone ${z} · ${esc(kind)}</p></div>
         <div class="controls">
           <label class="field">Audience
             <select name="audience">${opt(residents)}${opt("County")}

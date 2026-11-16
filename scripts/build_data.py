@@ -17,7 +17,7 @@ Outputs go to public/data/:
     rasters.json     manifest of raster layers (url, zooms, value range, units)
     terrain.pmtiles  Mapterhorn terrain for the hillshade (see MAPTERHORN_URLS)
     buildings.pmtiles Overture building footprints for the domain bbox
-    evacuation_zones.geojson  simplified evacuation zones with LifeSim impacts
+    evacuation_zones.geojson  evacuation zones (v2, two zones) with LifeSim impacts
     dam.geojson, reservoir.geojson  abstract modern dam (wall, spillway) and its reservoir
     cascade_*.geojson, cascade_summary.json  cascading impacts (see CASCADE_DIR)
     cascade_flooded_severity.json, cascade_flooded_use.json  flooded buildings and people by severity and by use
@@ -57,32 +57,18 @@ OUT = ROOT / "public" / "data"
 
 DOMAIN_SHP = SOURCE / "b_Potential Map Boundary" / "AidEM_MapDomain.shp"
 
-# Evacuation zones (3 polygons) with LifeSim direct impacts as attributes.
-# They come from ArcGIS Raster to Polygon: jagged, 1000+ slivers per zone, and
-# edges that stop fitting once each zone is simplified on its own. So the zones
-# are generalised together, as one coverage:
-#   1. rasterise each zone at EVAC_CELL and blur it (Gaussian, EVAC_SIGMA)
-#   2. the outer edge is where the blurred zones sum to >= EVAC_OUTER (< 0.5
-#      grows slightly, to make up for corners the smoothing cuts off)
-#   3. inside, each cell goes to the zone with the highest blurred value, so
-#      zones can't overlap or leave gaps, and contested edges are split fairly
-#   4. polygonise, simplify shared edges together (coverage_simplify), round
-#      corners with EVAC_SMOOTH Chaikin passes, drop pieces < EVAC_MIN_AREA
-# Units are the source CRS's (US survey feet). Zone areas stay within ~2%.
-EVAC_SHP = SOURCE / "c_Evacuation Zones" / "Evacuation_Zones.shp"
-EVAC_CELL = 5.0
-EVAC_SIGMA = 20.0
-EVAC_OUTER = 0.4
-EVAC_SIMPLIFY = 15.0
-EVAC_SMOOTH = 2
-EVAC_MIN_AREA = 10_000.0  # ~930 m2
+# Evacuation zones (2 polygons, v2 from Nov 2026) with LifeSim direct
+# impacts as attributes. Already simplified by the team, so they're only
+# reprojected. All_Collps and Crt_Collps are counts of structures.
+EVAC_SHP = SOURCE / "c_Evacuation Zones v2" / "Evacuation_Zones_v2.shp"
 
 # Cascading impacts (primary, secondary, tertiary) from the dam failure
-# analysis in ../data/johnstown_cascade (see its README; round 2). Already in
+# analysis in "../data/cascades v3" (round 3, Nov 2026: schools, hospitals and
+# power only; see the README there). Already in
 # WGS84. Facilities and service areas are slimmed to what the map shows;
 # buildings become points with their first tier only (1-3), since there are
 # ~51,000 of them. Service areas are simplified by CASCADE_SIMPLIFY degrees.
-CASCADE_DIR = SOURCE / "johnstown_cascade" / "output"
+CASCADE_DIR = SOURCE / "cascades v3" / "cambria_county_cascade_round3" / "output"
 CASCADE_SIMPLIFY = 0.0002  # ~20 m
 
 # Modern dam at the South Fork Dam site, drawn as 3D map layers. The flood
@@ -267,93 +253,24 @@ def build_domain() -> dict:
     return meta
 
 
-def _chaikin_ring(coords, n: int) -> np.ndarray:
-    pts = np.asarray(coords)[:-1]
-    for _ in range(n):
-        nxt = np.roll(pts, -1, axis=0)
-        pts = np.stack([0.75 * pts + 0.25 * nxt, 0.25 * pts + 0.75 * nxt], axis=1).reshape(-1, 2)
-    return np.vstack([pts, pts[:1]])
-
-
 def build_evacuation_zones() -> None:
-    """Generalise the evacuation zones as one coverage (see EVAC_*), reproject
-    to WGS84, keep all attributes."""
+    """Reproject the evacuation zones to WGS84, keep all attributes."""
     import shapely
-    from rasterio.features import rasterize, shapes
-    from rasterio.transform import from_origin
-    from scipy.ndimage import gaussian_filter
     from shapely.geometry import MultiPolygon, Polygon, mapping, shape
 
     crs = CRS.from_wkt(EVAC_SHP.with_suffix(".prj").read_text())
     to_wgs84 = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
-
     with shapefile.Reader(str(EVAC_SHP)) as shp:
         recs = sorted(
             ((r.record.as_dict(), shapely.make_valid(shape(r.shape.__geo_interface__))) for r in shp.iterShapeRecords()),
             key=lambda r: r[0]["Zone"],
         )
-    geoms = [g for _, g in recs]
-
-    # 1-3. Label grid
-    pad = 5 * EVAC_SIGMA
-    x0, y0, x1, y1 = shapely.union_all(geoms).bounds
-    x0, y0, x1, y1 = x0 - pad, y0 - pad, x1 + pad, y1 + pad
-    size = (int((y1 - y0) / EVAC_CELL) + 1, int((x1 - x0) / EVAC_CELL) + 1)
-    tr = from_origin(x0, y1, EVAC_CELL, EVAC_CELL)
-    blur = np.stack([
-        gaussian_filter(rasterize([g], size, transform=tr).astype(np.float32), EVAC_SIGMA / EVAC_CELL)
-        for g in geoms
-    ])
-    label = np.where(blur.sum(0) >= EVAC_OUTER, np.argmax(blur, 0) + 1, 0).astype(np.int32)
-    del blur
-
-    # 4. Polygons
-    pieces = [[] for _ in geoms]
-    for geom, v in shapes(label, mask=label > 0, transform=tr):
-        pieces[int(v) - 1].append(shape(geom))
-    coverage = shapely.coverage_simplify(
-        np.array([shapely.union_all(p) for p in pieces], dtype=object), EVAC_SIMPLIFY
-    )
-
-    zones, taken = [], None
-    for geom in coverage:
-        polys = [
-            shapely.make_valid(Polygon(
-                _chaikin_ring(p.exterior.coords, EVAC_SMOOTH),
-                [_chaikin_ring(i.coords, EVAC_SMOOTH) for i in p.interiors],
-            ))
-            for p in getattr(geom, "geoms", [geom])
-        ]
-        # Rounding quadruples the vertices; thin them out again (1 ft is invisible).
-        geom = shapely.union_all(polys).simplify(1.0)
-        # Smoothing moves shared edges by a hair at junctions; earlier zones win.
-        if taken is not None:
-            geom = geom.difference(taken)
-        geom = MultiPolygon([p for p in getattr(geom, "geoms", [geom]) if isinstance(p, Polygon) and p.area >= EVAC_MIN_AREA])
-        taken = geom if taken is None else taken.union(geom)
-        zones.append(geom)
-
-    # That also leaves hairline slits between zones. Give every hole in the
-    # union smaller than EVAC_MIN_AREA to the zone it shares the most edge with.
-    union = shapely.union_all(zones)
-    slits = [
-        Polygon(ring) for p in getattr(union, "geoms", [union]) for ring in p.interiors
-        if Polygon(ring).area < EVAC_MIN_AREA
-    ]
-    fill = [[] for _ in zones]
-    for slit in slits:
-        edge = slit.boundary.buffer(0.5)
-        best = max(range(len(zones)), key=lambda i: zones[i].intersection(edge).area)
-        fill[best].append(slit)
-    zones = [shapely.union_all([z, *f]) if f else z for z, f in zip(zones, fill)]
-    log(f"evacuation zones: filled {len(slits)} slit(s) between zones")
 
     features = []
-    for (props, src), geom in zip(recs, zones):
+    for props, geom in recs:
         parts = [p for p in getattr(geom, "geoms", [geom]) if isinstance(p, Polygon)]
-        geom = MultiPolygon(parts)
-        log(f"evacuation zones: zone {props['Zone']}: {len(parts)} part(s), area {geom.area / src.area:.1%} of source")
-        geom = shapely.transform(geom, lambda xy: np.column_stack(to_wgs84.transform(xy[:, 0], xy[:, 1])))
+        geom = shapely.transform(MultiPolygon(parts), lambda xy: np.column_stack(to_wgs84.transform(xy[:, 0], xy[:, 1])))
+        log(f"evacuation zones: zone {props['Zone']}: {len(parts)} part(s)")
         features.append({"type": "Feature", "id": props["Zone"], "properties": props, "geometry": mapping(geom)})
 
     def rounded(obj):
@@ -381,7 +298,7 @@ def build_cascade() -> None:
     tiers = {"primary": 1, "secondary": 2, "tertiary": 3}
     hours = lambda v: None if v is None else round(v, 2)
 
-    # Providers by id (CIKR facilities and water systems), for "caused by" names.
+    # Providers by id, for "caused by" names.
     areas = json.loads((CASCADE_DIR / "service_areas.geojson").read_text())["features"]
     provider = {f["properties"]["pid"]: f["properties"]["name"] for f in areas}
 
@@ -417,8 +334,8 @@ def build_cascade() -> None:
             "geometry": json.loads(json.dumps(mapping(geom)), parse_float=lambda s: round(float(s), 5)),
             "properties": {
                 "name": p["name"].strip(), "kind": p["kind"], "service": p["service"],
-                # utility: power, sewer and water, which other facilities depend on
-                "utility": p["kind"] in ("Gas-Fired Power Plant", "Wastewater Treatment Plants", "Public Water System", "Electric Substations"),
+                # utility: power, which other facilities depend on
+                "utility": p["kind"] in ("Electric Power Generation", "Electric Substations"),
                 "tier": tiers[p["tier"]], "certainty": p["certainty"], "basis": p["area_basis"],
                 "offline_h": hours(p["offline_h"]), "buildings": p["buildings"],
                 "pop_night": round(p["pop_night"] or 0), "pop_day": round(p["pop_day"] or 0),
@@ -431,8 +348,6 @@ def build_cascade() -> None:
     con.close()
     # One MultiPoint per tier and impact time (to 0.01 h) keeps the file small
     # (no per-building features) and lets the map show them as time passes.
-    # impact_h is null for buildings the cascade gives no time for; past the
-    # flooded tier those are drinking-water losses, which are only potential.
     points = {}
     for blob, tier, h in rows:
         flags = blob[3]
@@ -440,18 +355,14 @@ def build_cascade() -> None:
         pt = from_wkb(bytes(blob[8 + envelope:]))
         points.setdefault((tiers[tier], hours(h)), []).append([round(pt.x, 5), round(pt.y, 5)])
     buildings = [
-        {"type": "Feature", "geometry": {"type": "MultiPoint", "coordinates": c}, "properties": {"tier": t, "impact_h": h, "potential": h is None and t > 1, "count": len(c)}}
+        {"type": "Feature", "geometry": {"type": "MultiPoint", "coordinates": c}, "properties": {"tier": t, "impact_h": h, "count": len(c)}}
         for (t, h), c in sorted(points.items(), key=lambda kv: (kv[0][0], kv[0][1] is None, kv[0][1] or 0))
     ]
 
     # Links: which provider took out which facility (facility_links.csv), as
     # lines from provider to facility, for arrows on the map. Facilities are
-    # matched by name and type. Water systems have no location (their plants
-    # aren't public): their lines start at a point inside the service area
-    # only so every link has a geometry; "located" is false and the map
-    # leaves them off (they're listed in the facility details).
+    # matched by name and type.
     import csv
-    from shapely.geometry import shape as _shape
     where = {}
     for name in ["primary_facilities", "secondary_facilities", "tertiary_facilities"]:
         for f in json.loads((CASCADE_DIR / f"{name}.geojson").read_text())["features"]:
@@ -460,13 +371,11 @@ def build_cascade() -> None:
     by_name = {}
     for (n, t), c in where.items():
         by_name.setdefault(n, c)
-    area_point = {f["properties"]["pid"]: [round(c, 6) for c in _shape(f["geometry"]).representative_point().coords[0]] for f in areas}
     area_kind = {f["properties"]["pid"]: f["properties"]["kind"] for f in areas}
     links = []
     with open(CASCADE_DIR / "facility_links.csv") as fh:
         for r in csv.DictReader(fh):
-            water = r["from"].startswith("pws/")
-            a = area_point.get(r["from"]) if water else by_name.get(r["from_name"].strip())
+            a = by_name.get(r["from_name"].strip())
             b = where.get((r["to_name"].strip(), r["to_type"])) or by_name.get(r["to_name"].strip())
             if not a or not b or a == b:
                 log(f"cascade: link {r['from_name']} -> {r['to_name']} skipped (no location)")
@@ -476,7 +385,7 @@ def build_cascade() -> None:
                 "geometry": {"type": "LineString", "coordinates": [a, b]},
                 "properties": {
                     "from": r["from_name"].strip(), "to": r["to_name"].strip(), "kind": area_kind.get(r["from"]),
-                    "service": r["service_lost"], "certainty": r["certainty"], "located": not water,
+                    "service": r["service_lost"], "certainty": r["certainty"], "located": True,
                     "impact_h": hours(float(r["impact_h"])) if r["impact_h"] else None,
                 },
             })
@@ -1108,22 +1017,21 @@ def build_raster(cfg: dict, force: bool) -> dict:
 
 
 def build_zone_arrival() -> None:
-    """Typical flood arrival per evacuation zone (25th and 75th percentile of
-    the flood raster's first arrival inside the zone, hours since overtopping),
-    for the zone table and popup. LifeSim's own Arrv_lowq/uppq don't say what
-    they count from and don't match the raster, so the pages use these."""
-    import rasterio.mask
-    from shapely.geometry import mapping, shape
-    from shapely.ops import transform
-    zones = json.loads((OUT / "evacuation_zones.geojson").read_text())["features"]
+    """Typical flood arrival per evacuation zone: 25th and 75th percentile of
+    the time each flooded building in the zone first gets wet (the cascade
+    analysis's first_wet_h and evac_zone), so the river and reservoir don't
+    count but buildings flooded from the start do. Written in hours since
+    overtopping, like the flood clock. LifeSim's own Arrv_lowq/uppq don't say
+    what they count from, so the pages use these."""
+    summary = json.loads((CASCADE_DIR / "summary.json").read_text())
+    breach_h = summary["dam_failure_h"]  # first_wet_h is relative to the breach
+    con = sqlite3.connect(CASCADE_DIR / "impacted_buildings.gpkg")
+    rows = con.execute('SELECT evac_zone, first_wet_h FROM "primary" WHERE first_wet_h IS NOT NULL').fetchall()
+    con.close()
     out = {}
-    with rasterio.open(CACHE / "arrival_first_3857.tif") as src:
-        to_src = Transformer.from_crs(4326, src.crs, always_xy=True).transform
-        for f in zones:
-            a, _ = rasterio.mask.mask(src, [mapping(transform(to_src, shape(f["geometry"])))], crop=True, filled=False)
-            v = a.compressed()
-            v = v[(v >= 0) & (v < 100)]  # 200 is NoData (see DEM_ENCODING)
-            out[str(f["properties"]["Zone"])] = {"q25": round(float(np.percentile(v, 25)), 2), "q75": round(float(np.percentile(v, 75)), 2)}
+    for zone in sorted({str(z) for z, _ in rows if z is not None}):
+        v = np.array([h for z, h in rows if str(z) == zone]) + breach_h
+        out[zone] = {"q25": round(float(np.percentile(v, 25)), 2), "q75": round(float(np.percentile(v, 75)), 2), "buildings": int(v.size)}
     (OUT / "zone_arrival.json").write_text(json.dumps(out, indent=1))
     log(f"zones: wrote zone_arrival.json ({out})")
 

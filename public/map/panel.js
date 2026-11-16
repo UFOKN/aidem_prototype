@@ -5,7 +5,7 @@
 //   import { createPanel } from "./map/panel.js";
 //   createPanel(app);
 
-import { BREACH_HOURS, DEPTH_CLASSES, FLOODED, IMPACT_TIERS, LAYER_GROUPS, UTILITY_AREAS, VELOCITY_CLASSES, ZONES, clock, potentialSwatch } from "./core.js";
+import { BREACH_HOURS, DEPTH_CLASSES, FLOODED, IMPACT_TIERS, LAYER_GROUPS, UTILITY_AREAS, VELOCITY_CLASSES, ZONES, clock } from "./core.js";
 
 const swatch = (label, color, stroke) => `<span><i style="background:${color}${stroke ? `; box-shadow: inset 0 0 0 1px ${stroke}` : ""}"></i>${label}</span>`;
 // A stepped scale (like a risk scale): one bar of class colours, with the
@@ -24,12 +24,9 @@ export function legend(kind) {
   // flood advance, facilities are grey until the water reaches them.
   if (kind === "flooded") return swatch("Flooded buildings and facilities", IMPACT_TIERS[1].color);
   if (kind === "flooded-advance") return swatch("Flooded buildings and facilities", IMPACT_TIERS[1].color) + swatch("Facility not yet flooded", "#b0b0b0");
-  if (kind === "indirect") return swatch(IMPACT_TIERS[2].label, IMPACT_TIERS[2].color, IMPACT_TIERS[2].stroke) + swatch(IMPACT_TIERS[3].label, IMPACT_TIERS[3].color, IMPACT_TIERS[3].stroke)
-    + swatch("Potentially at risk", potentialSwatch());
-  if (kind === "impacts") return Object.values(IMPACT_TIERS).map((v) => swatch(v.label, v.color, v.stroke)).join("")
-    + swatch("Potentially at risk", potentialSwatch());
+  if (kind === "indirect") return swatch(IMPACT_TIERS[2].label, IMPACT_TIERS[2].color, IMPACT_TIERS[2].stroke) + swatch(IMPACT_TIERS[3].label, IMPACT_TIERS[3].color, IMPACT_TIERS[3].stroke);
+  if (kind === "impacts") return Object.values(IMPACT_TIERS).map((v) => swatch(v.label, v.color, v.stroke)).join("");
   if (kind === "tiers") return Object.values(IMPACT_TIERS).map((v) => swatch(v.label, v.color, v.stroke)).join("")
-    + swatch("Potentially at risk", potentialSwatch())
     + swatch("Not yet affected", "#b0b0b0");
   if (kind === "utilities") return Object.values(UTILITY_AREAS).map((v) => swatch(v.label, v.color)).join("");
   return "";
@@ -39,7 +36,6 @@ export function legend(kind) {
 // Step 3, layer panel). Each block shows while its layer group is on.
 const tierLegend = () => `<div class="tier-legend">
   ${[[IMPACT_TIERS[1], "directImpacts"], [IMPACT_TIERS[2], "indirectImpacts"], [IMPACT_TIERS[3], "indirectImpacts"],
-    [{ label: "Potentially at risk", note: "Depends on a drinking-water system the flood may reach", color: potentialSwatch() }, "indirectImpacts"],
     [{ label: "Not affected", color: "#cccccc" }, "directImpacts"]]
     .map(([t, group]) => `<div class="tier-item" data-group="${group}" style="--bar:${t.color}"><strong>${t.label}</strong>${t.note ? `<span>${t.note}</span>` : ""}</div>`).join("")}
 </div>`;

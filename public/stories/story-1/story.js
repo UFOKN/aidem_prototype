@@ -75,9 +75,9 @@ function overviewBounds() {
   }
   return b;
 }
-// The facility step 3 is about: the sewage plant at Dornick Point, flooded,
-// whose failure reaches the hospitals, schools and colleges it serves.
-const CASCADE_FACILITY = "DORNICK PT WWTP";
+// The facility step 3 is about: Franklin Power Ventures (hypothetical),
+// flooded, whose failure takes power from the hospitals and schools it serves.
+const CASCADE_FACILITY = "Franklin Power Ventures";
 const OVERVIEW = (fly) => ({ bounds: overviewBounds(), bearing: JOHNSTOWN.bearing, pitch: fly ? app.map.getPitch() : JOHNSTOWN.pitch, padding: TOOLS_PADDING });
 
 // Each step is a static state, so the URL (#2) always opens the same view.
@@ -202,7 +202,7 @@ function cascadeLayers({ keepFlood = false } = {}) {
   showImpacts({ direct: true, indirect: true });
 }
 
-// "Show cascades": a bouncing pill next to the sewage plant in steps 3 and 4.
+// "Show cascades": a bouncing pill next to the power plant in steps 3 and 4.
 // Clicking it selects the plant: its arrows grow out to the facilities it
 // takes out, then the buildings that lose a service fade in. It only shows
 // until the reader has seen one cascade (by the pill or by clicking a facility).
@@ -240,7 +240,7 @@ async function growLinks() {
 
 // Step 2 to 3: zoom out to the whole map, keeping the reader's flood layer,
 // and fade in the buildings that lose a service. Nothing is selected: the
-// "Show cascades" pill next to the sewage plant shows one cascade on click.
+// "Show cascades" pill next to the power plant shows one cascade on click.
 // Ends in step 3's state.
 async function playCascade() {
   const step = () => current === 2;
@@ -385,22 +385,21 @@ function facilityHtml(p) {
   const n = (v) => Math.round(v).toLocaleString("en-US");
   const tier = IMPACT_TIERS[p.tier];
   const when = impactClock(p.impact_h);
-  const potential = (l) => (l.certainty === "potential" ? ` <span class="na">(potentially at risk${l.located ? "" : ", location not public"})</span>` : "");
   const inLinks = p.links.filter((l) => l.to === p.name), outLinks = p.links.filter((l) => l.from === p.name);
   const status = p.tier === 1 ? `Flooded, ${p.depth_ft} ft deep` : `Loses ${p.services}`;
   return `<div class="detail">
     <button class="back">← Summary</button>
     <section>
       <h2><i style="background:${tier.color}"></i>${facilityName(p.name)}</h2>
-      <p class="type">${p.type}${p.certainty === "potential" ? " · potentially at risk" : ""}</p>
+      <p class="type">${p.type}</p>
       <table>
         <tr><td>${tier.label}</td><td>${status}</td></tr>
-        <tr><td>Offline</td><td>${when ?? "no time (potentially at risk)"}</td></tr>
+        <tr><td>Offline</td><td>${when ?? "no time"}</td></tr>
       </table>
     </section>
     ${inLinks.length ? `<section>
       <h2>Depends on</h2>
-      <table>${inLinks.map((l) => `<tr><td>${facilityName(l.from)}${potential(l)}</td><td>${l.service}</td></tr>`).join("")}</table>
+      <table>${inLinks.map((l) => `<tr><td>${facilityName(l.from)}</td><td>${l.service}</td></tr>`).join("")}</table>
     </section>` : ""}
     ${current < 2 ? `<section>
       <h2>Impacts</h2>
@@ -413,17 +412,17 @@ function facilityHtml(p) {
         <tr><td>People</td><td>${n(p.area.pop_day)}</td></tr>
       </table>` : ""}
       ${outLinks.length ? `<h3>Facilities</h3>
-      <p class="type">${outLinks.length} ${outLinks.length === 1 ? "facility loses" : "facilities lose"} ${outLinks[0].service}${potential(outLinks[0])}</p>
+      <p class="type">${outLinks.length} ${outLinks.length === 1 ? "facility loses" : "facilities lose"} ${outLinks[0].service}</p>
       <table>${outLinks.map((l) => `<tr><td>${facilityName(l.to)}</td></tr>`).join("")}</table>` : ""}
     </section>` : ""}
   </div>`;
 }
 
 function sidebarHtml() {
-  const z = [1, 2, 3].map((n) => app.zoneStats(n));
+  const z = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   const sum = (k) => z.reduce((a, p) => a + p[k], 0);
   const n = (v) => Math.round(v).toLocaleString("en-US");
-  const collapse = z.reduce((a, p) => a + (p.All_Struct * p.All_Collps) / 100, 0);
+  const collapse = z.reduce((a, p) => a + p.All_Collps, 0); // counts of structures (zones v2)
   const row = (label, value, cls = "") => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
   const swatch = (zone) => `<i style="background:${ZONES[zone].color}"></i>`;
   const f = FLOOD_FACTS;
@@ -469,7 +468,7 @@ function sidebarHtml() {
 function syncIndirect() {
   const el = sidebar.querySelector("section.indirect");
   if (!el) return;
-  const z = [1, 2, 3].map((n) => app.zoneStats(n));
+  const z = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   el.outerHTML = current >= 2
     ? impactsHtml(z.reduce((a, p) => a + p.Ind_LL, 0))
     : `<section class="indirect"><h2>Indirect impacts</h2><button class="calculate">Calculate cascading impacts</button></section>`;
@@ -481,7 +480,7 @@ function impactsHtml(indirectLifeLoss) {
   const n = (v) => Math.round(v).toLocaleString("en-US");
   const row = (label, value, cls = "") => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
   if (!impacts) {
-    return `<section class="indirect"><h2>Indirect impacts</h2><table>${row("Power, water, sewer, services", `<span class="na">not loaded</span>`)}${row("Indirect life loss", n(indirectLifeLoss))}</table></section>`;
+    return `<section class="indirect"><h2>Indirect impacts</h2><table>${row("Cascading impacts", `<span class="na">not loaded</span>`)}${row("Indirect life loss", n(indirectLifeLoss))}</table></section>`;
   }
   const b = impacts.buildings, fac = impacts.facilities;
   const first = (tier) => b[tier].first_affected;
@@ -509,11 +508,9 @@ function impactsHtml(indirectLifeLoss) {
     <table>
       ${row("Facilities losing a service", n(fac.secondary.first_affected.count))}
       ${row("of which hospitals", n(fac.secondary.affected_by_type.Hospitals ?? 0), "sub")}
-      ${row("of which EMS and fire", n((fac.secondary.affected_by_type.EMS ?? 0) + (fac.secondary.affected_by_type["Fire Stations"] ?? 0) + (fac.secondary.affected_by_type["Fire Stations EMS"] ?? 0)), "sub")}
-      ${row("of which schools and colleges", n((fac.secondary.affected_by_type.Schools ?? 0) + (fac.secondary.affected_by_type["Colleges and Universities"] ?? 0)), "sub")}
+      ${row("of which schools", n(fac.secondary.affected_by_type.Schools ?? 0), "sub")}
     </table>
     <table class="group">
-      ${row("Water systems potentially at risk", n(impacts.failed_providers.primary["Public Water System"] ?? 0))}
       ${row("Indirect life loss", n(indirectLifeLoss))}
     </table>
     </section>`;

@@ -84,11 +84,10 @@ function advanceRamp(t) {
   return ["interpolate", ["linear"], ["elevation"], ...stops];
 }
 
-// Evacuation zones, coloured by evacuation order. Triggers from the zones' Read Me.
+// Evacuation zones (v2: two zones).
 export const ZONES = {
-  1: { color: "#d7301f", trigger: "Evacuate at the start, when overtopping is forecast" },
-  2: { color: "#fc8d59", trigger: "Evacuate when dam performance becomes uncertain" },
-  3: { color: "#fdcc8a", trigger: "Evacuate shortly before failure" },
+  1: { color: "#d7301f" },
+  2: { color: "#fc8d59" },
 };
 const zoneColor = ["match", ["get", "Zone"], ...Object.entries(ZONES).flatMap(([z, v]) => [+z, v.color]), "#999"];
 // Selected zone: the same hue, darkened, at a stronger fill.
@@ -136,29 +135,17 @@ export const IMPACT_TIERS = {
 // Service areas themselves are never drawn; their data still gives the
 // buildings and people per facility and the story's overview bounds.
 export const UTILITY_AREAS = {
-  "Gas-Fired Power Plant": { label: "Power (hypothetical plant)", color: "#6a1b9a" },
-  "Wastewater Treatment Plants": { label: "Sewer", color: "#00796b" },
-  "Public Water System": { label: "Drinking water (potentially at risk)", color: "#37474f", dashed: true },
+  "Electric Power Generation": { label: "Power (hypothetical plant)", color: "#6a1b9a" },
 };
 const tierColor = (prop) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, v.color]), "#999"];
-const withAlpha = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")}, ${a})`;
-// Losses with no time (potential) are lighter: in the colour's alpha rather
-// than the opacity, so every impact building shares one opacity and a fade
-// (fadeInIndirectBuildings) ends exactly on each one's usual look.
-const POTENTIAL_ALPHA = 0.4; // x 0.75 opacity = 0.3
-const indirectColor = () => ["case", ["get", "potential"],
-  ["match", ["get", "tier"], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, withAlpha(v.color, POTENTIAL_ALPHA)]), withAlpha("#999999", POTENTIAL_ALPHA)],
-  tierColor("tier")];
-/** Legend colour for "Potentially at risk". */
-export const potentialSwatch = () => `color-mix(in srgb, ${IMPACT_TIERS[2].color} 35%, white)`;
 const SELECTED_OPACITY = 0.9; // buildings of the selected facility
-// An optional outline per tier (IMPACT_TIERS[t].stroke, 1 px), not on
-// potential losses. Its opacity follows the dot's (setDotOpacity).
+// An optional outline per tier (IMPACT_TIERS[t].stroke, 1 px). Its opacity
+// follows the dot's (setDotOpacity).
 const tierStroke = () => {
   const withStroke = Object.entries(IMPACT_TIERS).filter(([, v]) => v.stroke);
   return withStroke.length ? {
     "circle-stroke-color": ["match", ["get", "tier"], ...withStroke.flatMap(([t, v]) => [+t, v.stroke]), "rgba(0,0,0,0)"],
-    "circle-stroke-width": ["case", ["boolean", ["get", "potential"], false], 0, ["match", ["get", "tier"], ...withStroke.flatMap(([t]) => [+t, 1]), 0]],
+    "circle-stroke-width": ["match", ["get", "tier"], ...withStroke.flatMap(([t]) => [+t, 1]), 0],
   } : {};
 };
 // Impact buildings: hidden until their time (feature state "hidden"), faded
@@ -197,16 +184,15 @@ export const fmt = (n) => n.toLocaleString("en-US");
 // Zone popup
 
 export function zonePopupHtml(p) {
-  const z = ZONES[p.Zone] ?? { color: "#999", trigger: "" };
+  const z = ZONES[p.Zone] ?? { color: "#999" };
   return `
     <h3><i style="background:${z.color}"></i>Evacuation zone ${p.Zone}</h3>
-    <div class="trigger">${z.trigger}</div>
     <table>
       <tbody>
         <tr><th>Structures flooded</th><td>${fmt(p.All_Struct)}</td></tr>
         <tr><th>&nbsp; of which critical</th><td>${fmt(p.Crt_Struct)}</td></tr>
-        <tr><th>Likely to collapse</th><td>${p.All_Collps}%</td></tr>
-        <tr><th>&nbsp; critical structures</th><td>${p.Crt_Collps}%</td></tr>
+        <tr><th>Likely to collapse</th><td>${fmt(p.All_Collps)}</td></tr>
+        <tr><th>&nbsp; of which critical</th><td>${fmt(p.Crt_Collps)}</td></tr>
       </tbody>
       <tbody>
         <tr><th>Population at risk</th><td>${fmt(p.PAR_Day)}</td></tr>
@@ -241,15 +227,9 @@ export function impactClock(h) {
 // Readable facility names: the source abbreviates some and writes most in
 // capitals. Known abbreviations get a full name, the rest are title-cased.
 const FACILITY_NAMES = {
-  "DORNICK PT WWTP": "Dornick Point sewage plant",
-  "GREATER JOHNSTOWN WA RIVERSIDE": "Greater Johnstown Water Authority (Riverside)",
-  "HIGHLAND S & W AUTH BEAVERDAM": "Highland Sewer & Water Authority (Beaverdam)",
-  "SOUTHWESTERN CAMBRIA CNTY AUTH": "Southwestern Cambria County Authority",
-  "EAST TAYLOR MUNI AUTH": "East Taylor Municipal Authority",
-  "WCRO": "WCRO radio", "WLKJ-FM1": "WLKJ radio",
   "FOREST HILLS JSHS": "Forest Hills Junior/Senior High School",
   "GREATER JOHNSTOWN SHS": "Greater Johnstown Senior High School",
-  "JOHNSTOWN CCC": "Johnstown Community Corrections Center",
+  "GREATER JOHNSTOWN SCHOOL DISTRICT'S CYBE": "Greater Johnstown School District cyber school",
 };
 export function facilityName(s) {
   if (FACILITY_NAMES[s]) return FACILITY_NAMES[s];
@@ -276,7 +256,7 @@ export function facilityPopupHtml(p, links = []) {
     <div class="trigger">${p.type}</div>
     <table><tbody>
       <tr><th>${tier.label}</th><td>${what}</td></tr>
-      <tr><th>Offline</th><td>${when ?? "no time (potentially at risk)"}</td></tr>
+      <tr><th>Offline</th><td>${when ?? "no time"}</td></tr>
       ${takesOut}
     </tbody></table>
     ${p.impact_h != null && p.impact_h < 0 ? `<div class="note">Before the breach: from the river flows the model starts with.</div>` : ""}`;
@@ -549,7 +529,7 @@ export async function createMap(opts) {
           id: "cascade-buildings", type: "circle", source: "impact-buildings", filter: [">=", ["get", "tier"], 2],
           layout: { visibility: visibleAt("indirectImpacts"), "circle-sort-key": ["-", 0, ["get", "tier"]] },
           paint: {
-            "circle-color": indirectColor(),
+            "circle-color": tierColor("tier"),
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
             // Hidden until its impact time (feature state, see syncCascadeTime)
             "circle-opacity": indirectOpacity(),
@@ -621,7 +601,7 @@ export async function createMap(opts) {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 14, 7],
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": 1.5,
-            "circle-opacity": ["case", ["boolean", ["feature-state", "pending"], false], 1, ["==", ["get", "certainty"], "potential"], 0.35, 1],
+            "circle-opacity": 1,
           },
         })),
         {
@@ -1062,9 +1042,7 @@ export async function createMap(opts) {
     const links = name
       ? all.filter((f) => f.properties.from === name || f.properties.to === name || (level1.includes(f.properties.from) && f.properties.to !== name))
       : [];
-    // Water systems have no location (their plants aren't public): their
-    // links are left off the map and only listed in the details.
-    selectedLinks = links.filter((f) => f.properties.located);
+    selectedLinks = links;
     drawLinks();
     const names = name ? [...new Set([name, ...selectedLinks.flatMap((f) => [f.properties.from, f.properties.to])])] : selectedFacility ? [selectedFacility] : [];
     map.setFilter("cascade-linked", ["in", ["get", "name"], ["literal", names]]);
@@ -1074,8 +1052,8 @@ export async function createMap(opts) {
   }
 
   // Failure cascade of the selected facility (selectFacility): black arrows
-  // with a white outline from each provider to the facilities it took out;
-  // potential (drinking water) dashed. Drawn as SVG over the map rather than
+  // with a white outline from each provider to the facilities it took out.
+  // Drawn as SVG over the map rather than
   // as a map layer: with 3D terrain, MapLibre drapes line layers onto the
   // ground, under the 3D buildings. Each end is projected to the screen
   // (terrain included) on every frame; the line stops at the facility's ring.
@@ -1101,10 +1079,9 @@ export async function createMap(opts) {
       if (len < 2 * r + 4) continue; // ends too close together to show a line
       const ux = dx / len, uy = dy / len;
       const p = (t) => `${(a.x + ux * t).toFixed(1)},${(a.y + uy * t).toFixed(1)}`;
-      const dashed = f.properties.certainty === "potential" ? ' stroke-dasharray="4 3"' : "";
       const end = r + (len - 2 * r) * linkProgress;
       if (end - r < 1) continue; // not started yet
-      lines.push(`<path class="casing" d="M${p(r)}L${p(end)}"/><path class="line" d="M${p(r)}L${p(end)}"${dashed}/>`);
+      lines.push(`<path class="casing" d="M${p(r)}L${p(end)}"/><path class="line" d="M${p(r)}L${p(end)}"/>`);
       if (end < len / 2) continue; // the arrowhead appears once the line passes the middle
       // Arrowhead at the middle, pointing from provider to facility.
       const mx = a.x + dx / 2, my = a.y + dy / 2, nx = -uy, ny = ux;
@@ -1143,8 +1120,8 @@ export async function createMap(opts) {
 
   // Cascading impacts follow the flood clock while "Flood advance" is shown:
   // a building or facility appears once its impact time (hours after the
-  // dam failure) has passed. Items without a time (potential losses) show
-  // from the start. With any other flood layer, or none, everything shows.
+  // dam failure) has passed. Items without a time show from the start. With
+  // any other flood layer, or none, everything shows.
   // Done with feature state, which applies at once; changing a data-driven
   // paint property or filter instead rebuilds the tiles in the background
   // and could leave the map behind the clock. Facilities stay on the map,

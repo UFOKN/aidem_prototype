@@ -28,53 +28,53 @@
  "secondary": [
   {
    "use": "Homes",
-   "buildings": 40055,
-   "pop_day": 37253,
-   "pop_night": 84571
+   "buildings": 15249,
+   "pop_day": 14315,
+   "pop_night": 30544
   },
   {
    "use": "Businesses",
-   "buildings": 5059,
-   "pop_day": 18146,
-   "pop_night": 1905
+   "buildings": 1239,
+   "pop_day": 4152,
+   "pop_night": 291
   },
   {
    "use": "Industry",
-   "buildings": 439,
-   "pop_day": 2948,
-   "pop_night": 136
+   "buildings": 166,
+   "pop_day": 486,
+   "pop_night": 15
   },
   {
    "use": "Public buildings",
-   "buildings": 745,
-   "pop_day": 20512,
-   "pop_night": 2277
+   "buildings": 262,
+   "pop_day": 4268,
+   "pop_night": 89
   }
  ],
  "tertiary": [
   {
    "use": "Homes",
-   "buildings": 1870,
-   "pop_day": 1412,
-   "pop_night": 3900
+   "buildings": 23593,
+   "pop_day": 22045,
+   "pop_night": 49568
   },
   {
    "use": "Businesses",
-   "buildings": 597,
-   "pop_day": 618,
-   "pop_night": 127
+   "buildings": 3678,
+   "pop_day": 9737,
+   "pop_night": 1056
   },
   {
    "use": "Industry",
-   "buildings": 9,
-   "pop_day": 77,
-   "pop_night": 1
+   "buildings": 231,
+   "pop_day": 854,
+   "pop_night": 53
   },
   {
    "use": "Public buildings",
-   "buildings": 27,
-   "pop_day": 62,
-   "pop_night": 5
+   "buildings": 416,
+   "pop_day": 5223,
+   "pop_night": 95
   }
  ]
 }
