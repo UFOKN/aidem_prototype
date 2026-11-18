@@ -1,0 +1,67 @@
+/*! Basecoat 1.1.0 (MIT, https://github.com/hunvreus/basecoat): the native select (.field > select, select.select)
+    and textarea (.field > textarea, .textarea) rules only, from dist/basecoat.cdn.min.css. The drop shadow is
+    removed (flat). To go back: git checkout pre-basecoat -- public */
+
+:where(.field > select, select.select, .field > textarea, .textarea) {
+  --color-input: #bbbbbb;
+  --color-muted-foreground: #888888;
+  --color-primary: var(--accent, #4a5d70);
+  --color-primary-foreground: var(--accent-text, #ffffff);
+  --color-ring: #4a5d70;
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --radius-md: calc(0.625rem - 2px);
+  --spacing: 0.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --default-transition-duration: 0.15s;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(140,140,140)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  --tw-border-style: solid;
+  --tw-ring-offset-width: 0px;
+  --tw-inset-shadow: 0 0 #0000;
+  --tw-inset-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  font-family: Inter, system-ui, sans-serif;
+  color: #000000;
+  margin: 0;
+}
+
+.field>select,select.select{min-width:0;appearance:none;--tw-outline-style: none;outline-style:none;-webkit-user-select:none;user-select:none}
+:is(.field>select,select.select):disabled{cursor:not-allowed}
+:is(.field>select,select.select):disabled{opacity:50%}
+:is(.field>select,select.select) option,:is(.field>select,select.select) optgroup{background-color:Canvas;color:CanvasText}
+.field>textarea,.textarea{display:flex;field-sizing:content;min-height:calc(var(--spacing) * 16);width:100%;--tw-outline-style: none;outline-style:none}
+:is(.field>textarea,.textarea)::placeholder{color:var(--color-muted-foreground)}
+:is(.field>textarea,.textarea):disabled{cursor:not-allowed}
+:is(.field>textarea,.textarea):disabled{opacity:50%}
+.field>textarea,.textarea{border-radius:var(--radius-md);border-style:var(--tw-border-style);border-width:1px;border-color:var(--color-input);background-color:transparent;padding-inline:calc(var(--spacing) * 2.5);padding-block:calc(var(--spacing) * 2);font-size:var(--text-base);line-height:var(--tw-leading, var(--text-base--line-height));--tw-shadow: 0 0 #0000;box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow);transition-property:color,box-shadow;transition-timing-function:var(--tw-ease, var(--default-transition-timing-function));transition-duration:var(--tw-duration, var(--default-transition-duration))}
+:is(.field>textarea,.textarea):focus-visible{border-color:var(--color-ring)}
+:is(.field>textarea,.textarea):focus-visible{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+:is(.field>textarea,.textarea):focus-visible{--tw-ring-color: var(--color-ring)}
+@supports (color: color-mix(in lab,red,red)){:is(.field>textarea,.textarea):focus-visible{--tw-ring-color: color-mix(in oklab, var(--color-ring) 50%, transparent)}}
+:is(.field>textarea,.textarea)[aria-invalid=true]{border-color:var(--color-destructive)}
+:is(.field>textarea,.textarea)[aria-invalid=true]{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+:is(.field>textarea,.textarea)[aria-invalid=true]{--tw-ring-color: var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){:is(.field>textarea,.textarea)[aria-invalid=true]{--tw-ring-color: color-mix(in oklab, var(--color-destructive) 20%, transparent)}}
+@media(width>=48rem){.field>textarea,.textarea{font-size:var(--text-sm);line-height:var(--tw-leading, var(--text-sm--line-height))}}
+.field>select,select.select{height:calc(var(--spacing) * 9);width:fit-content;border-radius:var(--radius-md);border-style:var(--tw-border-style);border-width:1px;border-color:var(--color-input);background-color:transparent;padding-block:var(--spacing);padding-inline-start:calc(var(--spacing) * 2.5);padding-inline-end:calc(var(--spacing) * 8);font-size:var(--text-base);line-height:var(--tw-leading, var(--text-base--line-height));--tw-shadow: 0 0 #0000;box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow);transition-property:color,box-shadow;transition-timing-function:var(--tw-ease, var(--default-transition-timing-function));transition-duration:var(--tw-duration, var(--default-transition-duration));background-image:var(--chevron-down-icon-50);background-size:1rem;background-position:center right .625rem;background-repeat:no-repeat}
+:is(.field>select,select.select) *::selection{background-color:var(--color-primary)}
+:is(.field>select,select.select)::selection{background-color:var(--color-primary)}
+:is(.field>select,select.select) *::selection{color:var(--color-primary-foreground)}
+:is(.field>select,select.select)::selection{color:var(--color-primary-foreground)}
+:is(.field>select,select.select)::placeholder{color:var(--color-muted-foreground)}
+:is(.field>select,select.select):focus-visible{border-color:var(--color-ring)}
+:is(.field>select,select.select):focus-visible{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+:is(.field>select,select.select):focus-visible{--tw-ring-color: var(--color-ring)}
+@supports (color: color-mix(in lab,red,red)){:is(.field>select,select.select):focus-visible{--tw-ring-color: color-mix(in oklab, var(--color-ring) 50%, transparent)}}
+:is(.field>select,select.select)[aria-invalid=true]{border-color:var(--color-destructive)}
+:is(.field>select,select.select)[aria-invalid=true]{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+:is(.field>select,select.select)[aria-invalid=true]{--tw-ring-color: var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){:is(.field>select,select.select)[aria-invalid=true]{--tw-ring-color: color-mix(in oklab, var(--color-destructive) 20%, transparent)}}
+:is(.field>select,select.select)[data-size=sm]{height:calc(var(--spacing) * 8)}
+@media(width>=48rem){.field>select,select.select{font-size:var(--text-sm);line-height:var(--tw-leading, var(--text-sm--line-height))}}
+:is(.field>select,select.select):dir(rtl){background-position:center left .625rem}

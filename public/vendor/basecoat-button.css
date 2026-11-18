@@ -1,0 +1,129 @@
+/*! Basecoat 1.1.0 (MIT, https://github.com/hunvreus/basecoat): the `.btn` and `.button-group` rules only, taken from
+    dist/basecoat.cdn.min.css (npm: basecoat-css). The rest of Basecoat (Tailwind's page reset and the
+    other components) is left out so nothing else on the page changes. Use: class="btn", optionally
+    data-variant="primary|secondary|outline|ghost|link|destructive" and
+    data-size="xs|sm|lg|icon|icon-xs|icon-sm|icon-lg".
+    To go back to the old buttons: git checkout pre-basecoat -- public */
+
+/* The design tokens and Tailwind variables the rules read, mapped to this prototype's slate colours.
+   :where() keeps this at zero specificity, so a context (.card .btn) can override any of them. */
+:where(.btn) {
+  /* what Tailwind's page reset gives a button, which this file leaves out */
+  margin: 0;
+  padding-block: 0;
+  background-color: transparent;
+  color: inherit;
+  font-family: Inter, system-ui, sans-serif;
+  letter-spacing: inherit;
+  cursor: pointer;
+  --color-primary: var(--accent, #4a5d70);
+  --color-primary-foreground: var(--accent-text, #ffffff);
+  --color-secondary: var(--audience-off-bg, #cfd7e0);
+  --color-secondary-foreground: #000000;
+  --secondary: var(--color-secondary);
+  --color-foreground: #000000;
+  --foreground: #000000;
+  --color-background: #ffffff;
+  --color-border: #bbbbbb;
+  --color-muted: #f5f5f5;
+  --color-ring: #4a5d70;
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --radius-md: calc(0.625rem - 2px);
+  --spacing: 0.25rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
+  --font-weight-medium: 400; /* Basecoat: 500 */
+  --default-transition-duration: 0.15s;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  --tw-border-style: solid;
+  --tw-ring-offset-width: 0px;
+  --tw-inset-shadow: 0 0 #0000;
+  --tw-inset-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-translate-x: 0px;
+  --tw-translate-y: 0px;
+}
+
+.btn{display:inline-flex;flex-shrink:0;align-items:center;justify-content:center;white-space:nowrap;transition-property:all;transition-timing-function:var(--tw-ease, var(--default-transition-timing-function));transition-duration:var(--tw-duration, var(--default-transition-duration));--tw-outline-style: none;outline-style:none;-webkit-user-select:none;user-select:none}
+.btn:disabled{pointer-events:none}
+.btn:disabled{opacity:50%}
+.btn svg{pointer-events:none}
+.btn svg{flex-shrink:0}
+.btn{border-radius:var(--radius-md);border-style:var(--tw-border-style);border-width:1px;border-color:transparent;background-clip:padding-box;font-size:var(--text-sm);line-height:var(--tw-leading, var(--text-sm--line-height));--tw-font-weight: var(--font-weight-medium);font-weight:var(--font-weight-medium)}
+.btn:focus-visible{border-color:var(--color-ring)}
+.btn:focus-visible{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+.btn:focus-visible{--tw-ring-color: var(--color-ring)}
+@supports (color: color-mix(in lab,red,red)){.btn:focus-visible{--tw-ring-color: color-mix(in oklab, var(--color-ring) 50%, transparent)}}
+.btn:active:not(*[aria-haspopup]){--tw-translate-y: 1px;translate:var(--tw-translate-x) var(--tw-translate-y)}
+.btn[aria-invalid=true]{border-color:var(--color-destructive)}
+.btn[aria-invalid=true]{--tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+.btn[aria-invalid=true]{--tw-ring-color: var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){.btn[aria-invalid=true]{--tw-ring-color: color-mix(in oklab, var(--color-destructive) 20%, transparent)}}
+.btn svg:not([class*=size-]){width:calc(var(--spacing) * 4);height:calc(var(--spacing) * 4)}
+.btn:not([data-size]),.btn[data-size=default]{height:calc(var(--spacing) * 9);gap:calc(var(--spacing) * 1.5);padding-inline:calc(var(--spacing) * 2.5)}
+:is(.btn:not([data-size]),.btn[data-size=default]):has(*:is([data-icon=inline-end])){padding-right:calc(var(--spacing) * 2)}
+:is(.btn:not([data-size]),.btn[data-size=default]):has(*:is([data-icon=inline-start])){padding-left:calc(var(--spacing) * 2)}
+.btn[data-size=xs]{height:calc(var(--spacing) * 6);gap:var(--spacing);border-radius:min(var(--radius-md),8px);padding-inline:calc(var(--spacing) * 2);font-size:var(--text-xs);line-height:var(--tw-leading, var(--text-xs--line-height))}
+.btn[data-size=xs]:has(*:is([data-icon=inline-end])){padding-right:calc(var(--spacing) * 1.5)}
+.btn[data-size=xs]:has(*:is([data-icon=inline-start])){padding-left:calc(var(--spacing) * 1.5)}
+.btn[data-size=xs] svg:not([class*=size-]){width:calc(var(--spacing) * 3);height:calc(var(--spacing) * 3)}
+.btn[data-size=sm]{height:calc(var(--spacing) * 8);gap:var(--spacing);border-radius:min(var(--radius-md),10px);padding-inline:calc(var(--spacing) * 2.5)}
+.btn[data-size=sm]:has(*:is([data-icon=inline-end])){padding-right:calc(var(--spacing) * 1.5)}
+.btn[data-size=sm]:has(*:is([data-icon=inline-start])){padding-left:calc(var(--spacing) * 1.5)}
+.btn[data-size=lg]{height:calc(var(--spacing) * 10);gap:calc(var(--spacing) * 1.5);padding-inline:calc(var(--spacing) * 2.5)}
+.btn[data-size=lg]:has(*:is([data-icon=inline-end])){padding-right:calc(var(--spacing) * 2)}
+.btn[data-size=lg]:has(*:is([data-icon=inline-start])){padding-left:calc(var(--spacing) * 2)}
+.btn[data-size=icon]{width:calc(var(--spacing) * 9);height:calc(var(--spacing) * 9)}
+.btn[data-size=icon-xs]{width:calc(var(--spacing) * 6);height:calc(var(--spacing) * 6);border-radius:min(var(--radius-md),8px)}
+.btn[data-size=icon-xs] svg:not([class*=size-]){width:calc(var(--spacing) * 3);height:calc(var(--spacing) * 3)}
+.btn[data-size=icon-sm]{width:calc(var(--spacing) * 8);height:calc(var(--spacing) * 8);border-radius:min(var(--radius-md),10px)}
+.btn[data-size=icon-lg]{width:calc(var(--spacing) * 10);height:calc(var(--spacing) * 10)}
+.btn:not([data-variant]),.btn[data-variant=primary]{background-color:var(--color-primary);color:var(--color-primary-foreground)}
+@media(hover:hover){:is(.btn:not([data-variant]),.btn[data-variant=primary]):hover{background-color:var(--color-primary)}@supports (color: color-mix(in lab,red,red)){:is(.btn:not([data-variant]),.btn[data-variant=primary]):hover{background-color:color-mix(in oklab,var(--color-primary) 80%,transparent)}}}
+.btn[data-variant=secondary]{background-color:var(--color-secondary);color:var(--color-secondary-foreground)}
+@media(hover:hover){.btn[data-variant=secondary]:hover{background-color:var(--secondary)}@supports (color: color-mix(in lab,red,red)){.btn[data-variant=secondary]:hover{background-color:color-mix(in oklch,var(--secondary),var(--foreground) 5%)}}}
+.btn[data-variant=secondary][aria-expanded=true]{background-color:var(--color-secondary)}
+.btn[data-variant=secondary][aria-expanded=true]{color:var(--color-secondary-foreground)}
+.btn[data-variant=outline]{border-color:var(--color-border);background-color:var(--color-background);--tw-shadow: 0 0 #0000; /* Basecoat has a 1px drop shadow here; flat in this prototype */box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+@media(hover:hover){.btn[data-variant=outline]:hover{background-color:var(--color-muted)}}
+@media(hover:hover){.btn[data-variant=outline]:hover{color:var(--color-foreground)}}
+.btn[data-variant=outline][aria-expanded=true]{background-color:var(--color-muted)}
+.btn[data-variant=outline][aria-expanded=true]{color:var(--color-foreground)}
+@media(hover:hover){.btn[data-variant=ghost]:hover{background-color:var(--color-muted)}}
+@media(hover:hover){.btn[data-variant=ghost]:hover{color:var(--color-foreground)}}
+.btn[data-variant=ghost][aria-expanded=true]{background-color:var(--color-muted)}
+.btn[data-variant=ghost][aria-expanded=true]{color:var(--color-foreground)}
+.btn[data-variant=link]{color:var(--color-primary);text-underline-offset:4px}
+@media(hover:hover){.btn[data-variant=link]:hover{text-decoration-line:underline}}
+.btn[data-variant=destructive]{background-color:var(--color-destructive);color:var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){.btn[data-variant=destructive]{background-color:color-mix(in oklab,var(--color-destructive) 10%,transparent)}}
+@media(hover:hover){.btn[data-variant=destructive]:hover{background-color:var(--color-destructive)}@supports (color: color-mix(in lab,red,red)){.btn[data-variant=destructive]:hover{background-color:color-mix(in oklab,var(--color-destructive) 20%,transparent)}}}
+.btn[data-variant=destructive]:focus-visible{border-color:var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){.btn[data-variant=destructive]:focus-visible{border-color:color-mix(in oklab,var(--color-destructive) 40%,transparent)}}
+.btn[data-variant=destructive]:focus-visible{--tw-ring-color: var(--color-destructive)}
+@supports (color: color-mix(in lab,red,red)){.btn[data-variant=destructive]:focus-visible{--tw-ring-color: color-mix(in oklab, var(--color-destructive) 20%, transparent)}}
+
+/* Button group: buttons joined into one control (used for the toggles) */
+.button-group{isolation:isolate;display:inline-flex;width:fit-content;align-items:stretch}
+.button-group:has(>:is(.dropdown-menu,.popover,.select)>[data-popover][aria-hidden=false]){position:relative;z-index:50}
+.button-group>.input{flex:1}
+.button-group>*:focus-visible,.button-group>:is(.dropdown-menu,.popover,.select)>button:focus-visible{position:relative;z-index:10}
+.button-group>hr[role=separator]{position:relative;margin-inline:0;margin-block:1px;height:auto;width:1px;flex-shrink:0;align-self:stretch;border-style:var(--tw-border-style);border-width:0px}
+.button-group:not([data-orientation=vertical])>*:not(:first-child),.button-group:not([data-orientation=vertical])>:is(.dropdown-menu,.popover,.select):not(:first-child)>button{border-start-start-radius:0;border-end-start-radius:0;border-inline-start-style:var(--tw-border-style);border-inline-start-width:0px}
+.button-group:not([data-orientation=vertical])>*:not(:last-child),.button-group:not([data-orientation=vertical])>:is(.dropdown-menu,.popover,.select):not(:last-child)>button{border-start-end-radius:0;border-end-end-radius:0}
+.button-group[data-orientation=vertical]{flex-direction:column}
+.button-group[data-orientation=vertical]>hr[role=separator]{margin-inline:1px;margin-block:0;height:1px;width:auto}
+.button-group[data-orientation=vertical]>*:not(:first-child),.button-group[data-orientation=vertical]>:is(.dropdown-menu,.popover,.select):not(:first-child)>button{border-top-left-radius:0;border-top-right-radius:0;border-top-style:var(--tw-border-style);border-top-width:0px}
+.button-group[data-orientation=vertical]>*:not(:last-child),.button-group[data-orientation=vertical]>:is(.dropdown-menu,.popover,.select):not(:last-child)>button{border-bottom-right-radius:0;border-bottom-left-radius:0}
+.button-group>:is(span,label,output){display:flex;align-items:center}
+.button-group>:is(span,label,output) svg{pointer-events:none}
+.button-group:has(>.button-group){gap:calc(var(--spacing) * 2)}
+.button-group:not([data-orientation=vertical])>:last-child,.button-group:not([data-orientation=vertical])>:is(.dropdown-menu,.popover,.select):last-child>button{border-start-end-radius:var(--radius-md)!important;border-end-end-radius:var(--radius-md)!important}
+.button-group[data-orientation=vertical]>:last-child,.button-group[data-orientation=vertical]>:is(.dropdown-menu,.popover,.select):last-child>button{border-bottom-right-radius:var(--radius-md)!important;border-bottom-left-radius:var(--radius-md)!important}
+.button-group>:is(span,label,output){gap:calc(var(--spacing) * 2);border-radius:var(--radius-md);border-style:var(--tw-border-style);border-width:1px;background-color:var(--color-muted);padding-inline:calc(var(--spacing) * 2.5);font-size:var(--text-sm);line-height:var(--tw-leading, var(--text-sm--line-height));--tw-font-weight: var(--font-weight-medium);font-weight:var(--font-weight-medium);--tw-shadow: 0 0 #0000; /* Basecoat has a 1px drop shadow here; flat in this prototype */box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}
+.button-group>:is(span,label,output) svg:not([class*=size-]){width:calc(var(--spacing) * 4);height:calc(var(--spacing) * 4)}
+.button-group>hr[role=separator]{background-color:var(--color-input)}

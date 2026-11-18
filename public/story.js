@@ -10,6 +10,8 @@ import { floodTables, toggleUses } from "./summary.js";
 // Opening view on the South Fork Dam (from the explorer's URL
 // #16.72/40.348515/-78.774338/176.3/60: zoom/lat/lng/bearing/pitch).
 const DAM_VIEW = { center: [-78.774338, 40.348515], zoom: 16.72, bearing: 176.3, pitch: 60, elevation: 474.5 };
+// Step 1: the dam sits in the space right of the story card (360 px wide, 10 px in)
+const DAM_PADDING = { top: 0, right: 0, bottom: 0, left: 380 };
 
 // Cascading impacts summary (data/johnstown_cascade, copied by the pipeline).
 const impacts = await fetch("data/cascade_summary.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -20,12 +22,14 @@ const getJson = (f) => fetch(`data/${f}`).then((r) => (r.ok ? r.json() : null)).
 const [cascadeFacilities, cascadeLinks, serviceAreas] = await Promise.all(["cascade_facilities.geojson", "cascade_links.geojson", "cascade_service_areas.geojson"].map(getJson));
 
 const app = await createMap({
+  compass: false,
+  rotate: false,
   container: "map",
   flood: null,
   layers: { evac: false }, // counties (domain) always on
   terrain: true,
   facilityPopup: false, // facility details replace the summary in the sidebar
-  mapOptions: { bounds: undefined, ...DAM_VIEW },
+  mapOptions: { bounds: undefined, ...DAM_VIEW, padding: DAM_PADDING },
 });
 window.app = app;
 
@@ -69,6 +73,8 @@ const TOOLS_PADDING = { top: 70, right: 390, bottom: 30, left: 390 }; // sidebar
 function showImpacts({ direct, indirect }) {
   app.setLayer("directImpacts", direct);
   app.setLayer("indirectImpacts", indirect);
+  // Step 2 also shows the facilities the flood doesn't reach, grey, until the cascade is calculated
+  app.showNeutralFacilities(direct && !indirect);
 }
 // Whole map from above: the flood model's extent plus the service areas of
 // the cascading impacts, with step 2's bearing. The pitch stays as it is
@@ -99,7 +105,7 @@ const steps = [
     title: "Introduction",
     html: `
       <img src="dam-1889.png" alt="">
-      <p class="credit">Image: NPS/Harpers Ferry Center</p>
+      <p class="credit">Image: <a href="https://www.nps.gov/jofl/learn/historyculture/the-south-fork-dam.htm" target="_blank" rel="noopener">NPS/Harpers Ferry Center</a></p>
       <p class="note">On May 31, 1889 the South Fork Dam failed after heavy rainfall, releasing 20 million tons of water. It caused the Johnstown Flood that claimed more than 2,200 lives.</p>
       <p>This scenario of a fictional, present day dam failure at South Fork shows how AidEM helps agencies work together from first flood map to an effective evacuation order</p>`,
     next: "Start →",
@@ -111,7 +117,7 @@ const steps = [
       app.selectFacility(null);
       app.setCascades(false);
       hideTools();
-      moveCamera({ ...DAM_VIEW, padding: NO_PADDING }, fly);
+      moveCamera({ ...DAM_VIEW, padding: DAM_PADDING }, fly);
     },
   },
   {
@@ -166,7 +172,9 @@ const steps = [
       app.setCascades(true);
       hidePill();
       const [a, b] = [CASCADE_FACILITY, HOSPITAL].map((n) => app.facilityInfo(n).lngLat);
-      const bounds = [[Math.min(a[0], b[0]), Math.min(a[1], b[1])], [Math.max(a[0], b[0]), Math.max(a[1], b[1])]];
+      // Centred on the hospital, with the plant still in view: the bounds reach as far past the hospital as the plant is away
+      const [dx, dy] = [Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])];
+      const bounds = [[b[0] - dx, b[1] - dy], [b[0] + dx, b[1] + dy]];
       moveCamera({ bounds, bearing: JOHNSTOWN.bearing, pitch: JOHNSTOWN.pitch, padding: TOOLS_PADDING, maxZoom: 15 }, fly);
       app.selectFacility(HOSPITAL);
     },
@@ -190,10 +198,11 @@ const steps = [
 // close-up to the vista over the valley while the water runs towards West
 // Point, then a glide to Johnstown as the front gets there. Ends in step 2.
 async function playFlood() {
+  ensurePanel().classList.add("slider-only");
+  setTransition(true); // the slider shows at once, but can't be used until the flood has got to Johnstown
   app.setFlood("arrival_first", { fade: true });
   showImpacts({ direct: true, indirect: false }); // they appear as the water reaches them
   app.setTime(BREACH_HOURS);
-  app.map.setPadding(NO_PADDING);
   // While the animation runs, the next button skips to its end.
   let skipped = false;
   setSkip(() => { skipped = true; app.map.stop(); app.pause(); });
@@ -201,14 +210,16 @@ async function playFlood() {
   // and clicked on before the camera got there, finish that move first.
   const c = app.map.getCenter();
   if (Math.abs(c.lng - DAM_VIEW.center[0]) + Math.abs(c.lat - DAM_VIEW.center[1]) > 0.001) {
-    await flyTo(DAM_VIEW, 1000);
+    await flyTo({ ...DAM_VIEW, padding: DAM_PADDING }, 1000);
   }
   if (current !== 1) return;
   app.map.setCenterClampedToGround(false);
   if (!skipped) {
     stopGlide = app.on("time", (t) => {
       if (t <= VISTA_AT) {
-        app.map.jumpTo(lerpCamera(DAM_VIEW, VISTA, ease((t - BREACH_HOURS) / (VISTA_AT - BREACH_HOURS)), TO_VISTA_VIA));
+        // The dam's offset from the card eases out while the camera leaves it
+        const k = ease((t - BREACH_HOURS) / (VISTA_AT - BREACH_HOURS));
+        app.map.jumpTo({ ...lerpCamera(DAM_VIEW, VISTA, k, TO_VISTA_VIA), padding: { ...NO_PADDING, left: DAM_PADDING.left * (1 - k) } });
       } else if (t >= GLIDE_FROM) {
         app.map.jumpTo(lerpCamera(VISTA, JOHNSTOWN, ease((t - GLIDE_FROM) / (JOHNSTOWN_HOURS - GLIDE_FROM))));
       }
@@ -218,6 +229,7 @@ async function playFlood() {
     stopGlide = null;
   }
   if (current !== 1) return; // left the step mid-animation
+  setTransition(false);
   setSkip(null);
   app.map.setCenterClampedToGround(true);
   steps[1].show({ fly: false, slide: true }); // played through or skipped: step 2's state
@@ -239,10 +251,10 @@ function cascadeLayers({ keepFlood = false } = {}) {
 let pill = null;
 function showPill() {
   if (!pill) {
-    const el = document.createElement("button");
+    const el = document.createElement("div");
     el.className = "cascade-pill";
-    el.textContent = "Show cascades";
-    el.addEventListener("click", (e) => { e.stopPropagation(); go(3); }); // step 4 selects the hospital
+    el.innerHTML = `<button>Show cascades</button>`;
+    el.querySelector("button").addEventListener("click", (e) => { e.stopPropagation(); go(3); }); // step 4 selects the hospital
     pill = new app.maplibregl.Marker({ element: el, anchor: "left", offset: [16, 0] }).setLngLat(app.facilityInfo(HOSPITAL).lngLat);
   }
   if (!app.facility && current === 2) pill.addTo(app.map);
@@ -281,6 +293,8 @@ async function playCascade() {
   app.map.setLayoutProperty("cascade-buildings", "visibility", "none"); // fades in after the zoom
   const { bounds, ...camera } = OVERVIEW(true);
   if (!app.map.cameraForBounds(bounds, camera)) camera.padding = NO_PADDING; // narrow window, see moveCamera
+  // The buildings that lose a service fade in while the map zooms out
+  const buildingsIn = keep ? null : app.fadeInIndirectBuildings(3500);
   await new Promise((resolve) => {
     app.map.once("moveend", resolve);
     app.map.fitBounds(bounds, { ...camera, duration: 3500 });
@@ -295,7 +309,7 @@ async function playCascade() {
     if (step() && app.facility === keep) app.showAffectedBuildings({ fade: 1000 });
     return;
   }
-  await app.fadeInIndirectBuildings(1200);
+  await buildingsIn;
   if (step()) showPill();
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -349,10 +363,23 @@ function flyTo(camera, duration = 2500) {
 
 let panel = null;
 // Without slide they appear in place (body.instant turns the transitions off).
-function showTools(slide = true) {
+function ensurePanel() {
   // No evacuation zones toggle in story 5, and one toggle for both impact groups
   // (indirect ones only once the cascade is calculated, step 3 on)
   panel ??= createPanel(app, { evac: false, oneImpactToggle: true, impactGroups: () => (current >= 2 ? ["directImpacts", "indirectImpacts"] : ["directImpacts"]) });
+  return panel;
+}
+// The flood slider alone shows already while the flood runs (step 1 to 2): no layer toggle, no impacts
+// card, and play and the slider are off. When the transition is over, or skipped, the whole panel shows
+// (user, Nov 19)
+function setTransition(on) {
+  const el = ensurePanel();
+  el.classList.toggle("slider-only", on);
+  el.classList.toggle("early", on);
+  for (const c of el.querySelectorAll(".play, input.time")) c.disabled = on;
+}
+function showTools(slide = true) {
+  ensurePanel();
   if (!sidebar.querySelector(".scroll")) sidebar.insertAdjacentHTML("beforeend", sidebarHtml()); // below the audience toggle
   syncIndirect();
   if (slide) {
@@ -365,6 +392,7 @@ function showTools(slide = true) {
 }
 function hideTools() {
   document.body.classList.remove("tools");
+  panel?.classList.remove("early", "slider-only");
 }
 
 // --- Sidebar ---------------------------------------------------------------
@@ -412,11 +440,11 @@ function facilityHtml(p) {
       </table>
     </section>
     ${current < 2 ? `<section>
-      <h2>Impacts</h2>
-      <button class="calculate">Calculate cascading impacts</button>
+      <h2>Estimated impacts</h2>
+      <button class="btn calculate" data-size="sm">Calculate cascading impacts</button>
     </section>` : ""}
     ${current >= 2 && (inLinks.length || outLinks.length || p.area) ? `<section>
-      <h2>Impacts</h2>
+      <h2>Estimated impacts</h2>
       ${cascadeGraphSvg(p, (name) => app.facilityInfo(name))}
     </section>` : ""}
   </div>`;
@@ -437,8 +465,9 @@ function sidebarHtml() {
 // people are counted once, in the first tier where they lose something, so
 // the tiers add up; facilities likewise. Primary buildings are any that get
 // wet (NSI), so the count differs from LifeSim's structures above.
-// All impacts from the flood modeling step (2) on, Lives at risk above it
-// from the cascade step (3); before that, nothing (an empty, hidden placeholder).
+// Lives at risk and All impacts from the flood modeling step (2) on (Figma
+// comment, Nov 18); step 2 leaves out the indirect life loss row, which waits
+// for the cascade step (3). Before step 2, nothing (an empty, hidden placeholder).
 function syncIndirect() {
   const el = sidebar.querySelector("section.indirect");
   if (!el) return;
@@ -447,22 +476,33 @@ function syncIndirect() {
   if (app.facility) renderDetail();
 }
 
-function impactsHtml(lives = true) {
-  if (!lives) return `<section class="indirect" hidden></section>${allImpactsHtml(true)}`;
+// Direct life loss as two bars on one scale (Figma comment, Nov 19: "do this vis
+// for now"): the 0-2 h warning bar fills the width, the 2-6 h warning bar is
+// scaled to it, its figure ending at the bar's end.
+function livesBars(zones) {
+  const tot = (k) => zones.reduce((a, z) => a + z[k], 0);
+  const [a, b] = [tot("LL_D_Min"), tot("LL_D_Amp")];
+  const n = (v) => Math.round(v).toLocaleString("en-US");
+  return `<div class="lives-bars" role="img" aria-label="Direct life loss: ${n(a)} with 0 to 2 hours of warning, ${n(b)} with 2 to 6 hours">
+      <div class="lbl"><span>0\u202F–\u202F2 h warning</span><b>${n(a)}</b></div>
+      <div class="bar" style="width:100%; background:${IMPACT_TIERS[1].color}"></div>
+      <div class="bar second" style="width:${(100 * b) / a}%"></div>
+      <div class="lbl" style="padding-right:${100 - (100 * b) / a}%"><span>2\u202F–\u202F6 h warning</span><b>${n(b)}</b></div>
+    </div>`;
+}
+
+function impactsHtml(cascaded = true) {
   const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   // Lives at risk, with the same content as story 4's risk overview (LifeSim)
   const sum = (k) => Math.round(zones.reduce((a, z) => a + z[k], 0)).toLocaleString("en-US");
   return `<section class="indirect">
-    <h2>Lives at risk</h2>
-    <table>
-      <tr><td>Direct, with 0–2 h warning</td><td>${sum("LL_D_Min")}</td></tr>
-      <tr><td>Direct, with 2–6 h warning</td><td>${sum("LL_D_Amp")}</td></tr>
-      <tr><td>Indirect</td><td>${sum("Ind_LL")}</td></tr>
-    </table>
+    <h2>Estimated life loss</h2>
+    ${livesBars(zones)}
+    ${cascaded ? `<table><tr><td>Indirect</td><td>${sum("Ind_LL")}</td></tr></table>` : ""}
     <table class="group">
       <tr><td>Structures likely to collapse</td><td>${sum("All_Collps")}</td></tr>
     </table>
-    </section>${allImpactsHtml()}`;
+    </section>${allImpactsHtml(!cascaded)}`;
 }
 
 // All impacts (draft, from story 4's risk overview, made compact for the
@@ -538,7 +578,7 @@ function allImpactsHtml(pending = false) {
     return `<li data-facility="${e.name}">${guides(e, i)}<span style="padding-left:${e.depth * 16}px"><span class="dot" style="background:${IMPACT_TIERS[e.tier].color}${time ? "; margin-top: 21px" : ""}"></span><span>${time ? `<time>${time}</time>` : ""}${e.text}${a ? `<small>${n(a.pop_day)} people lose ${a.service}</small>` : ""}</span></span></li>`;
   };
   return `<section class="all-impacts">
-    <h2>All impacts</h2>
+    <h2>Estimated impacts</h2>
     <h3>People</h3>
     <table class="cols">
       ${body(peopleRows, `<tr class="total"><td>Total</td><td data-value="${n(tiers.reduce((a, t) => a + t.pop_day, 0))}">${n(sum("pop_day"))}</td></tr>`)}
@@ -602,7 +642,7 @@ const prev = document.querySelector(".card .prev");
 const next = document.querySelector(".card .next");
 const startOver = document.querySelector(".card .start-over");
 // Minimize: the card shrinks to a "Guided tour +" button that opens it again
-document.querySelector(".card .minimize").addEventListener("click", () => card.classList.add("min"));
+document.querySelector(".card .head").addEventListener("click", () => card.classList.add("min")); // the whole header row, as in the EM interface
 document.querySelector(".card .restore").addEventListener("click", () => card.classList.remove("min"));
 let current = -1;
 
@@ -643,9 +683,11 @@ function go(i) {
   app.map.stop();
   app.map.setCenterClampedToGround(true);
   app.pause();
+  if (panel) setTransition(false);
   const step = steps[i];
   setCardText(step.html);
   document.querySelector(".card .step").textContent = step.title;
+  document.querySelector(".card .head").hidden = i === 0;
   next.textContent = step.next;
   prev.hidden = i === 0;
   startOver.hidden = i === 0;

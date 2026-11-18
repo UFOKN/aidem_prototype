@@ -5,6 +5,7 @@
 //   import { createPanel } from "./map/panel.js";
 //   createPanel(app);
 
+import { timelineHtml, setPlaying, updateTimeline, watchTimeline } from "./timeline.js";
 import { BREACH_HOURS, DEPTH_CLASSES, FLOODED, IMPACT_TIERS, LAYER_GROUPS, UTILITY_AREAS, VELOCITY_CLASSES, ZONES, clock } from "./core.js";
 
 const swatch = (label, color, stroke) => `<span><i style="background:${color}${stroke ? `; box-shadow: inset 0 0 0 1px ${stroke}` : ""}"></i>${label}</span>`;
@@ -19,15 +20,15 @@ export function legend(kind) {
   if (kind === "velocity") return scale(VELOCITY_CLASSES, "ft/s");
   if (kind === "advance") return swatch("Flooded", FLOODED);
   if (kind === "zones") return Object.entries(ZONES).map(([z, v]) => swatch(`Zone ${z}`, v.color)).join("");
-  if (kind === "direct") return swatch(IMPACT_TIERS[1].label, IMPACT_TIERS[1].color) + swatch("Not yet affected", "#b0b0b0");
+  if (kind === "direct") return swatch(IMPACT_TIERS[1].label, IMPACT_TIERS[1].color) + swatch("Not yet affected", "#808080");
   // Flooded buildings and facilities on a flood map (story 3); with the
   // flood advance, facilities are grey until the water reaches them.
   if (kind === "flooded") return swatch("Flooded buildings and facilities", IMPACT_TIERS[1].color);
-  if (kind === "flooded-advance") return swatch("Flooded buildings and facilities", IMPACT_TIERS[1].color) + swatch("Facility not yet flooded", "#b0b0b0");
+  if (kind === "flooded-advance") return swatch("Flooded buildings and facilities", IMPACT_TIERS[1].color) + swatch("Facility not yet flooded", "#808080");
   if (kind === "indirect") return swatch(IMPACT_TIERS[2].label, IMPACT_TIERS[2].color, IMPACT_TIERS[2].stroke) + swatch(IMPACT_TIERS[3].label, IMPACT_TIERS[3].color, IMPACT_TIERS[3].stroke);
   if (kind === "impacts") return Object.values(IMPACT_TIERS).map((v) => swatch(v.label, v.color, v.stroke)).join("");
   if (kind === "tiers") return Object.values(IMPACT_TIERS).map((v) => swatch(v.label, v.color, v.stroke)).join("")
-    + swatch("Not yet affected", "#b0b0b0");
+    + swatch("Not yet affected", "#808080");
   if (kind === "utilities") return Object.values(UTILITY_AREAS).map((v) => swatch(v.label, v.color)).join("");
   return "";
 }
@@ -35,11 +36,10 @@ export function legend(kind) {
 // Impact tiers as stacked blocks with a coloured bar (Figma: Story 1 /
 // Step 3, layer panel). Each block shows while its layer group is on.
 // Story 4 draws its map legend from these blocks too.
-export const NOT_AFFECTED = { label: "Not affected", color: "#cccccc" };
 /** One block for a tier ({ label, note?, color }); group ties it to a layer group. */
 export const tierItem = (t, group) => `<div class="tier-item"${group ? ` data-group="${group}"` : ""} style="--bar:${t.color}"><strong>${t.label}</strong>${t.note ? `<span>${t.note}</span>` : ""}</div>`;
 const tierLegend = () => `<div class="tier-legend">
-  ${[[IMPACT_TIERS[1], "directImpacts"], [IMPACT_TIERS[2], "indirectImpacts"], [IMPACT_TIERS[3], "indirectImpacts"], [NOT_AFFECTED, "directImpacts"]]
+  ${[[IMPACT_TIERS[1], "directImpacts"], [IMPACT_TIERS[2], "indirectImpacts"], [IMPACT_TIERS[3], "indirectImpacts"]]
     .map(([t, group]) => tierItem(t, group)).join("")}
 </div>`;
 
@@ -53,24 +53,18 @@ export function createPanel(app, { parent = document.body, evac = true, oneImpac
   el.innerHTML = `
     <div class="panel-card">
     <section>
-      <h2>Flood</h2>
-      <div class="segmented" role="group" aria-label="Flood layer">
-        <button data-flood="depth_max" aria-pressed="false" title="Maximum depth">Depth</button>
-        <button data-flood="velocity_max" aria-pressed="false" title="Maximum velocity">Velocity</button>
-        <button data-flood="arrival_first" aria-pressed="false" title="Flood advance over time">Timeline</button>
-      </div>
+      <h2 class="layer-title" data-flood="arrival_first">Flood advance</h2>
+      <h2 class="layer-title" data-flood="depth_max">Depth in feet</h2>
+      <h2 class="layer-title" data-flood="velocity_max">Velocity in feet per second</h2>
       <div class="legend" data-flood="depth_max">${legend("depth")}</div>
       <div class="legend" data-flood="velocity_max">${legend("velocity")}</div>
-      <div class="advance" hidden>
-        <div class="clock">
-          <button class="play" title="Play / pause">▶</button>
-          <div><strong class="clock-time">${clock(0)}</strong></div>
-        </div>
-        <input class="time" type="range" min="0" max="${app.maxHours}" step="0.01" value="0">
-        <div class="ticks">
-          <span style="left:${(BREACH_HOURS / app.maxHours) * 100}%">▲ breach</span>
-        </div>
-        <div class="legend">${legend("advance")}</div>
+      <div class="advance" hidden>${timelineHtml(app.maxHours, BREACH_HOURS)}
+      </div>
+      <hr class="rule">
+      <div class="segmented button-group" role="group" aria-label="Flood layer">
+        <button class="btn" data-variant="outline" data-size="xs" data-flood="arrival_first" aria-pressed="false" title="Flood advance over time">Timeline</button>
+        <button class="btn" data-variant="outline" data-size="xs" data-flood="depth_max" aria-pressed="false" title="Maximum depth">Depth</button>
+        <button class="btn" data-variant="outline" data-size="xs" data-flood="velocity_max" aria-pressed="false" title="Maximum velocity">Velocity</button>
       </div>
     </section>
     </div>
@@ -102,7 +96,7 @@ export function createPanel(app, { parent = document.body, evac = true, oneImpac
   const syncFlood = (id) => {
     for (const b of segments) b.setAttribute("aria-pressed", b.dataset.flood === id);
     advance.hidden = id !== "arrival_first";
-    for (const l of el.querySelectorAll(".legend[data-flood]")) l.hidden = l.dataset.flood !== id;
+    for (const l of el.querySelectorAll(".legend[data-flood], .layer-title[data-flood]")) l.hidden = l.dataset.flood !== id;
   };
   for (const b of segments) b.addEventListener("click", () => app.setFlood(b.dataset.flood));
   app.on("flood", syncFlood);
@@ -144,11 +138,13 @@ export function createPanel(app, { parent = document.body, evac = true, oneImpac
   const syncTime = (t) => {
     slider.value = t;
     $(".clock-time").textContent = clock(t);
+    updateTimeline(el);
   };
+  watchTimeline(el);
   app.on("time", syncTime);
   syncTime(app.time);
   slider.addEventListener("input", () => { app.pause(); app.setTime(+slider.value); });
-  app.on("play", (on) => (playBtn.textContent = on ? "❚❚" : "▶"));
+  app.on("play", (on) => setPlaying(playBtn, on));
   playBtn.addEventListener("click", () => (app.playing ? app.pause() : app.play()));
 
   return el;

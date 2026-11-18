@@ -29,8 +29,8 @@ export function directTables(zones, impacts, { populationAtRisk = true, lifeLoss
     </table>` : ""}
     ${lifeLoss ? `<table class="cols">
       <thead><tr><th>Life loss</th><th></th></tr></thead>
-      <tr><td>0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td></tr>
-      <tr><td>2–6 h warning</td><td>${n(sum("LL_D_Amp"))}</td></tr>
+      <tr><td>0\u202F–\u202F2 h warning</td><td>${n(sum("LL_D_Min"))}</td></tr>
+      <tr><td>2\u202F–\u202F6 h warning</td><td>${n(sum("LL_D_Amp"))}</td></tr>
     </table>` : ""}
     <table>
       ${row("Structures flooded", n(sum("All_Struct")))}

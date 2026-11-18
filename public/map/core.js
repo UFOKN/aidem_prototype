@@ -46,8 +46,8 @@ function stepped(below, ...pairs) {
 
 // Max depth in ft, stepped classes: <2, 2-6, 6-10, 10-20, 20-40, 40+.
 export const DEPTH_CLASSES = [
-  ["< 2 ft", "#c6dbef", 0], ["2–6", "#9ecae1", 2], ["6–10", "#6baed6", 6],
-  ["10–20", "#4292c6", 10], ["20–40", "#2171b5", 20], ["40+", "#084594", 40],
+  ["< 2 ft", "#c6dbef", 0], ["2\u202F–\u202F6", "#9ecae1", 2], ["6\u202F–\u202F10", "#6baed6", 6],
+  ["10\u202F–\u202F20", "#4292c6", 10], ["20\u202F–\u202F40", "#2171b5", 20], ["40+", "#084594", 40],
 ];
 const DEPTH_RAMP = stepped("rgba(0,0,0,0)", ...DEPTH_CLASSES.flatMap(([, c, v]) => [v, c]));
 const FLOOD_OPACITY = 0.85;
@@ -59,8 +59,8 @@ const FLOOD_OPACITY = 0.85;
 // flooded area (28/23/25/13/11%) and line up with rough hazard steps: hard to
 // wade from ~2 ft/s, people and cars swept from ~5, building damage from ~10.
 export const VELOCITY_CLASSES = [
-  ["< 2 ft/s", "#feebe2", 0], ["2–5", "#fbb4b9", 2], ["5–10", "#f768a1", 5],
-  ["10–15", "#c51b8a", 10], ["15+", "#7a0177", 15],
+  ["< 2 ft/s", "#feebe2", 0], ["2\u202F–\u202F5", "#fbb4b9", 2], ["5\u202F–\u202F10", "#f768a1", 5],
+  ["10\u202F–\u202F15", "#c51b8a", 10], ["15+", "#7a0177", 15],
 ];
 const VELOCITY_RAMP = stepped("rgba(0,0,0,0)", ...VELOCITY_CLASSES.flatMap(([, c, v]) => [v, c]));
 
@@ -164,7 +164,7 @@ export const IMPACT_TIERS = {
   // carries it on the white map and the blue flood. Story 3 reads these too.
   1: { label: "Flooded", color: "#7a0177" },
   // "Indirect impacts" is the umbrella for tiers 2 and 3 (layer group, sidebar).
-  2: { label: "Loss of service", note: "Depends on flooded facility", color: "#d6336c" },
+  2: { label: "Loss of service", note: "Depends on a flooded facility", color: "#d6336c" },
   3: { label: "Cascading loss of service", note: "Depends on facility that lost service", color: "#f39c12", stroke: "#9a5b00" },
 };
 // Colours of the failed utilities, by what they provide (legend only; the
@@ -175,6 +175,8 @@ export const UTILITY_AREAS = {
   "Electric Power Generation": { label: "Power (hypothetical plant)", color: "#6a1b9a" },
 };
 const tierColor = (prop) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, v.color]), "#999"];
+// Darker shades of the tier colours (k: the share of each channel kept), for hovered and pressed facilities
+const tierColorDarker = (prop, k) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, darken(v.color, k)]), darken("#999999", k)];
 const SELECTED_OPACITY = 0.9; // buildings of the selected facility
 // An optional outline per tier (IMPACT_TIERS[t].stroke). It thins out as the
 // map zooms out (none at zoom 10 and below, 1 px from 15), and the outlined
@@ -200,7 +202,7 @@ const towardsDim = (v, k) => v + (DIM_OPACITY - v) * k;
 const IMPACT_OPACITY = 0.75;
 const indirectOpacity = (k = 1) => hiddenOr(towardsDim(IMPACT_OPACITY, k), IMPACT_OPACITY);
 const floodedOpacity = indirectOpacity;
-const FACILITY_PENDING = "#b0b0b0"; // facilities not yet affected (flood advance)
+const FACILITY_PENDING = "#808080"; // facilities not yet affected (flood advance)
 
 // Modern dam (built by the pipeline, see DAM_* in scripts/build_data.py),
 // drawn abstractly as a translucent wall plus the spillway shape at its NE end.
@@ -243,7 +245,7 @@ export function zonePopupHtml(p) {
       </tbody>
     </table>
     <table style="margin-top:8px">
-      <thead><tr><th class="sub">Life loss</th><th>0–2 h warning</th><th>2–6 h warning</th></tr></thead>
+      <thead><tr><th class="sub">Life loss</th><th>0\u202F–\u202F2 h warning</th><th>2\u202F–\u202F6 h warning</th></tr></thead>
       <tbody>
         <tr><th>Direct</th><td>${fmt(p.LL_D_Min)}</td><td>${fmt(p.LL_D_Amp)}</td></tr>
         <tr><th>Indirect</th><td colspan="2">${fmt(p.Ind_LL)}</td></tr>
@@ -251,16 +253,16 @@ export function zonePopupHtml(p) {
     </table>
     <table style="margin-top:8px">
       <tbody>
-        <tr><th>Typical depth</th><td>${p.Depth_lowq}–${p.Depth_uppq} ft</td></tr>
+        <tr><th>Typical depth</th><td>${p.Depth_lowq}\u202F–\u202F${p.Depth_uppq} ft</td></tr>
         <tr><th>Typical flood arrival</th><td>${arrivalClock(p.arrival)}</td></tr>
       </tbody>
     </table>
-    <div class="note">Life loss is the mean for one scenario (warning time); don't add the columns. Typical = 25th–75th percentile.</div>`;
+    <div class="note">Life loss is the mean for one scenario (warning time); don't add the columns. Typical = 25th\u202F–\u202F75th percentile.</div>`;
 }
 
 /** Typical flood arrival of a zone ({q25, q75} in model hours, zone_arrival.json) as clock times: "2:04 PM–2:46 PM". */
 export function arrivalClock(a) {
-  return a ? `${clock(a.q25)}–${clock(a.q75)}` : "";
+  return a ? `${clock(a.q25)}\u202F–\u202F${clock(a.q75)}` : "";
 }
 
 /** Clock time of an impact given in hours relative to the breach ("5:10 AM"); null without a time. */
@@ -321,9 +323,10 @@ export function facilityPopupHtml(p, links = []) {
  *   to the page (listen to the "facility" event, look up with app.facilityInfo(name))
  * @param {boolean} [opts.controls=true]    zoom/compass and scale controls
  * @param {boolean} [opts.compass=true]     the compass (rotation) button in the zoom control
+ * @param {boolean} [opts.rotate=true]      false: the reader can't change the bearing (no right-drag, two-finger twist or keyboard rotation)
  * @param {boolean} [opts.tooltips=true]    the flood value under the cursor (depth, velocity, arrival)
  * @param {boolean} [opts.facilityClick=true] click a facility to select it (and open its popup)
- * @param {boolean} [opts.facilityNames=false] hovering a facility shows its name
+ * @param {boolean} [opts.facilityNames=true] hovering a facility shows its name and what happens to it, not the flood value
  * @param {boolean|number} [opts.terrain=false]  3D terrain; a number sets the exaggeration
  * @param {object} [opts.mapOptions]        passed through to maplibregl.Map
  */
@@ -364,7 +367,7 @@ export async function createMap(opts) {
   const {
     container, hash = false, flood = "depth_max", layers = {},
     zonePopup = true, facilityPopup: useFacilityPopup = true, controls = true, terrain = false, mapOptions = {},
-    compass = true, tooltips = true, facilityClick = true, facilityNames = false,
+    compass = true, rotate = true, tooltips = true, facilityClick = true, facilityNames = true,
   } = opts;
 
   const empty = { type: "FeatureCollection", features: [] };
@@ -522,17 +525,17 @@ export async function createMap(opts) {
         {
           id: "evac-fill", type: "fill", source: "evac",
           layout: { visibility: visibleAt("evac") },
-          paint: { "fill-color": zoneColor, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], ["+", zoneOpacity, 0.2], zoneOpacity] },
+          paint: { "fill-color": zoneColor, "fill-opacity": zoneOpacity }, // stronger in focus (applyZoneFocus)
         },
         {
           id: "evac-selected-fill", type: "fill", source: "evac", filter: ["==", ["id"], -1],
           layout: { visibility: visibleAt("evac") },
-          paint: { "fill-color": zoneColorDark, "fill-opacity": 0.5 },
+          paint: { "fill-color": zoneColorDark, "fill-opacity": 0.4 },
         },
         {
           id: "evac-line", type: "line", source: "evac",
           layout: { visibility: visibleAt("evac") },
-          paint: { "line-color": zoneColor, "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2.5, 1.2] },
+          paint: { "line-color": zoneColor, "line-width": 1.2 }, // wider in focus (applyZoneFocus)
         },
         {
           id: "dam", type: "fill-extrusion", source: "dam", filter: ["in", ["get", "kind"], ["literal", ["body", "spill"]]],
@@ -643,8 +646,14 @@ export async function createMap(opts) {
           paint: {
             // Always shown; grey until its impact time in flood advance
             // (feature state "pending", see syncCascadeTime).
-            "circle-color": ["case", ["boolean", ["feature-state", "pending"], false], FACILITY_PENDING, tierColor("tier")],
-            "circle-radius": FACILITY_RADIUS,
+            // Hovered facilities are a little darker and larger, pressed ones more so
+            // (feature states "hover" and "active", see the facility mouse handlers).
+            "circle-color": ["case", ["boolean", ["feature-state", "pending"], false],
+              ["case", ["boolean", ["feature-state", "active"], false], darken(FACILITY_PENDING, 0.7), ["boolean", ["feature-state", "hover"], false], darken(FACILITY_PENDING, 0.85), FACILITY_PENDING],
+              ["case", ["boolean", ["feature-state", "active"], false], tierColorDarker("tier", 0.7), ["boolean", ["feature-state", "hover"], false], tierColorDarker("tier", 0.85), tierColor("tier")]],
+            "circle-radius": ["interpolate", ["linear"], ["zoom"],
+              9, ["+", 8, ["case", ["boolean", ["feature-state", "active"], false], 2.5, ["boolean", ["feature-state", "hover"], false], 1.5, 0]],
+              14, ["+", 12, ["case", ["boolean", ["feature-state", "active"], false], 2.5, ["boolean", ["feature-state", "hover"], false], 1.5, 0]]],
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": 1.5,
             "circle-opacity": 1,
@@ -685,12 +694,22 @@ export async function createMap(opts) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: compass }), "top-right");
     map.addControl(new ScaleBar(), "bottom-left");
   }
+  // Bearing locked: the reader can zoom and pan, the story sets the bearing
+  const lockRotation = () => {
+    if (rotate) return;
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+  };
+  lockRotation();
   window.map = map; // handy in the console
   await new Promise((resolve) => map.once("load", resolve));
 
   // --- API -----------------------------------------------------------------
   const events = new EventTarget();
   const emit = (type, detail) => events.dispatchEvent(new CustomEvent(type, { detail }));
+  let neutralIndirect = false; // step 2: facilities that lose a service later are shown grey (showNeutralFacilities)
+  const layerFlags = {}; // the last setLayer value per group
   const setVisible = (id, on) => {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
   };
@@ -702,6 +721,19 @@ export async function createMap(opts) {
   // opens the popup on another zone, closing it again. Handled below instead.
   const popup = new maplibregl.Popup({ className: "zone-popup", maxWidth: "300px", closeOnClick: false });
   let selectedZone = null;
+  // Zone in focus: the one under the cursor, else the selected one. It is
+  // drawn stronger and the other zones fade back, so a zone selected from the
+  // page looks the same as one clicked on the map.
+  let hoveredZone = null;
+  function applyZoneFocus() {
+    const focus = hoveredZone ?? selectedZone;
+    const isFocus = ["==", ["id"], focus ?? -1];
+    map.setPaintProperty("evac-fill", "fill-opacity", focus == null ? zoneOpacity : ["case", isFocus, ["+", zoneOpacity, 0.2], 0.08]);
+    // The selected zone has its fill only, no outline; a hovered one gets a heavier line
+    const isSelected = ["==", ["id"], selectedZone ?? -1];
+    map.setPaintProperty("evac-line", "line-opacity", focus == null ? 1 : ["case", isSelected, 0, isFocus, 1, 0.25]);
+    map.setPaintProperty("evac-line", "line-width", focus == null ? 1.2 : ["case", isFocus, 2.5, 1.2]);
+  }
 
   // Raster values under the cursor: read the flood layer's own PMTiles at
   // maxzoom and decode the pixel (same encoding the map uses for colours).
@@ -805,8 +837,21 @@ export async function createMap(opts) {
     get playing() { return raf !== null; },
 
     /** Show or hide a layer group from LAYER_GROUPS. */
+    /**
+     * Show the facilities that are not flooded (the ones that lose a service later) in grey
+     * before the cascade is calculated; false puts them back under the indirect impacts layer.
+     */
+    showNeutralFacilities(on) {
+      neutralIndirect = on;
+      layerFlags.neutral = on;
+      applyNeutralFacilities();
+      cascadeCutoff = undefined; // the grey comes from the facilities' pending state
+      syncCascadeTime();
+    },
     setLayer(name, on) {
+      layerFlags[name] = on;
       (LAYER_GROUPS[name] ?? [name]).forEach((id) => setVisible(id, on));
+      applyNeutralFacilities();
       if (name === "evac" && !on) popup.remove();
       emit("layer", { name, on });
     },
@@ -822,6 +867,7 @@ export async function createMap(opts) {
       if (zone != null && at) popup.setLngLat(at).setHTML(zonePopupHtml(app.zoneStats(zone))).addTo(map);
       selectedZone = zone;
       map.setFilter("evac-selected-fill", ["==", ["id"], zone ?? -1]);
+      applyZoneFocus();
       emit("zone", zone);
     },
     get zone() { return selectedZone; },
@@ -887,6 +933,7 @@ export async function createMap(opts) {
     /** Turn the reader's map controls (pan, zoom, rotate) on or off. */
     setInteractive(on) {
       for (const h of ["scrollZoom", "boxZoom", "dragRotate", "dragPan", "keyboard", "doubleClickZoom", "touchZoomRotate"]) map[h][on ? "enable" : "disable"]();
+      if (on) lockRotation();
     },
 
     /** Show the selected facility's buildings, fading in over `fade` ms. */
@@ -946,15 +993,22 @@ export async function createMap(opts) {
     if (selectedZone != null) {
       selectedZone = null;
       map.setFilter("evac-selected-fill", ["==", ["id"], -1]);
+      applyZoneFocus();
       emit("zone", null);
     }
   });
+  // Facility tooltip: its name, then what happens to it and when ("Loss of service · 2:54 PM")
+  const facilityTipHtml = (p) => {
+    const t = impactClock(p.impact_h);
+    const status = neutralIndirect && p.tier >= 2 ? "Not flooded" : IMPACT_TIERS[p.tier] ? IMPACT_TIERS[p.tier].label + (t ? ` · ${t}` : "") : "";
+    return `<strong>${facilityName(p.name)}</strong>${status ? `<div class="tip-status">${status}</div>` : ""}`;
+  };
   // Value tooltip: follows the cursor while a layer from TOOLTIPS is shown.
   let hoverSeq = 0;
   map.on("mousemove", async (e) => {
     const seq = ++hoverSeq;
     const fac = facilityNames && facilityAt(e.point);
-    if (fac) return tooltip.setLngLat(fac.geometry.coordinates).setHTML(facilityName(fac.properties.name)).addTo(map);
+    if (fac) return tooltip.setLngLat(fac.geometry.coordinates).setHTML(facilityTipHtml(fac.properties)).addTo(map);
     const format = tooltips && TOOLTIPS[floodId];
     if (!format) return tooltip.remove();
     const v = await app.valueAt(floodId, e.lngLat);
@@ -983,10 +1037,30 @@ export async function createMap(opts) {
   // Without the popup, a click elsewhere on the map clears the selection.
   map.on("click", (e) => { if (!useFacilityPopup && selectedFacility && !facilityAt(e.point)) app.selectFacility(null); });
   facilityPopup.on("close", () => app.selectFacility(null));
+  // Hover and pressed look: feature states on the facility under the cursor
+  let hoveredFacility = null, pressedFacility = null;
+  const facilityState = (id, state) => id != null && map.setFeatureState({ source: "impact-facilities", id }, state);
+  const hoverFacility = (id) => {
+    if (id === hoveredFacility) return;
+    facilityState(hoveredFacility, { hover: false });
+    hoveredFacility = id;
+    facilityState(id, { hover: true });
+  };
+  const releaseFacility = () => { facilityState(pressedFacility, { active: false }); pressedFacility = null; };
   for (const id of FACILITY_LAYERS) {
-    map.on("mousemove", id, (e) => (map.getCanvas().style.cursor = facilityClick && e.features.some(shown) ? "pointer" : ""));
-    map.on("mouseleave", id, () => (map.getCanvas().style.cursor = ""));
+    map.on("mousemove", id, (e) => {
+      map.getCanvas().style.cursor = facilityClick && e.features.some(shown) ? "pointer" : "";
+      if (facilityClick) hoverFacility(e.features.find(shown)?.id ?? null);
+    });
+    map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; hoverFacility(null); });
+    map.on("mousedown", id, (e) => {
+      if (!facilityClick) return;
+      releaseFacility();
+      pressedFacility = e.features.find(shown)?.id ?? null;
+      facilityState(pressedFacility, { active: true });
+    });
   }
+  window.addEventListener("mouseup", releaseFacility);
   // With both facility layers off, nothing is left to select.
   app.on("layer", ({ name }) => {
     if (name in LAYER_GROUPS && /Impacts$/.test(name) && !facilityLayersOn().length) { facilityPopup.remove(); app.selectFacility(null); }
@@ -1002,18 +1076,17 @@ export async function createMap(opts) {
     });
     // Hover: stronger fill and outline on the zone under the cursor; the
     // other zones fade back.
-    let hovered = null;
-    const setHover = (zone) => {
-      if (zone === hovered) return;
-      if (hovered != null) map.setFeatureState({ source: "evac", id: hovered }, { hover: false });
-      if (zone != null) map.setFeatureState({ source: "evac", id: zone }, { hover: true });
-      hovered = zone;
-      const hover = ["boolean", ["feature-state", "hover"], false];
-      map.setPaintProperty("evac-fill", "fill-opacity", ["case", hover, ["+", zoneOpacity, 0.2], zone != null ? 0.08 : zoneOpacity]);
-      map.setPaintProperty("evac-line", "line-opacity", ["case", hover, 1, zone != null ? 0.25 : 1]);
-      map.getCanvas().style.cursor = zone != null ? "pointer" : "";
+    // Over a facility the facility has the cursor, so its zone drops the hover.
+    const setHover = (zone, { cursor = true } = {}) => {
+      if (zone === hoveredZone) return;
+      hoveredZone = zone;
+      applyZoneFocus();
+      if (cursor) map.getCanvas().style.cursor = zone != null ? "pointer" : "";
     };
-    map.on("mousemove", "evac-fill", (e) => setHover(e.features[0]?.id ?? null));
+    map.on("mousemove", "evac-fill", (e) => {
+      if (facilityAt(e.point)) setHover(null, { cursor: false });
+      else setHover(e.features[0]?.id ?? null);
+    });
     map.on("mouseleave", "evac-fill", () => setHover(null));
   }
 
@@ -1124,7 +1197,11 @@ export async function createMap(opts) {
   map.getCanvasContainer().appendChild(linkSvg);
   let selectedLinks = [];
   let linkProgress = 1; // how far along the arrows are drawn (setLinkProgress)
-  const FLOW_SPACING = 70, FLOW_SPEED = 30; // px between flowing arrowheads, px a second
+  // The stream is measured on the ground, so it moves with the map: zooming scales it with the
+  // lines instead of speeding it up or running it backwards.
+  const LINK_BULGE = 0.12; // how far the arcs bow out, as a share of their length
+  const FLOW_SPACING_M = 500, FLOW_SPEED_M = 200; // metres between flowing arrowheads, metres a second
+  const metresBetween = ([lng1, lat1], [lng2, lat2]) => Math.hypot((lng2 - lng1) * 111320 * Math.cos((lat1 * Math.PI) / 180), (lat2 - lat1) * 110540);
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   // Radius of the rings around linked facilities (cascade-linked), plus a gap.
   const ringRadius = (z) => 11 + (Math.min(Math.max(z, 9), 14) - 9) * (4 / 5) + 2;
@@ -1140,24 +1217,43 @@ export async function createMap(opts) {
       const [a, b] = ends.map((c) => map.project(c));
       const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
       if (len < 2 * r + 4) continue; // ends too close together to show a line
-      const ux = dx / len, uy = dy / len;
-      const p = (t) => `${(a.x + ux * t).toFixed(1)},${(a.y + uy * t).toFixed(1)}`;
-      const end = r + (len - 2 * r) * linkProgress;
-      if (end - r < 1) continue; // not started yet
-      lines.push(`<path class="casing" d="M${p(r)}L${p(end)}"/><path class="line" d="M${p(r)}L${p(end)}"/>`);
-      if (end < len / 2) continue; // the arrowhead appears once the line passes the middle
-      // Arrowheads pointing from provider to facility: one at the middle
+      const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+      // A shallow arc, like a flight path: a quadratic curve between the two rings, bulging to the left of the way it points
+      const L = len - 2 * r;
+      const P0 = { x: a.x + ux * r, y: a.y + uy * r }, P1 = { x: a.x + ux * (len - r), y: a.y + uy * (len - r) };
+      const C = { x: (P0.x + P1.x) / 2 + nx * L * LINK_BULGE, y: (P0.y + P1.y) / 2 + ny * L * LINK_BULGE };
+      const bez = (k) => ({ x: (1 - k) ** 2 * P0.x + 2 * (1 - k) * k * C.x + k * k * P1.x, y: (1 - k) ** 2 * P0.y + 2 * (1 - k) * k * C.y + k * k * P1.y });
+      const pt2 = (q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`;
+      if (L * linkProgress < 1) continue; // not started yet
+      // The part drawn so far: the curve up to linkProgress (de Casteljau)
+      const Cs = { x: P0.x + (C.x - P0.x) * linkProgress, y: P0.y + (C.y - P0.y) * linkProgress };
+      const d = `M${pt2(P0)}Q${pt2(Cs)} ${pt2(bez(linkProgress))}`;
+      lines.push(`<path class="casing" d="${d}"/><path class="line" d="${d}"/>`);
+      if (linkProgress < 0.5) continue; // the arrowhead appears once the line passes the middle
+      // Arrowheads pointing from provider to facility along the curve: one at the middle
       // while the line grows (or with reduced motion), then a stream of them
       // flowing along it.
-      const nx = -uy, ny = ux;
-      const head = (t) => {
-        const mx = a.x + ux * t, my = a.y + uy * t;
-        const pt = (along, side) => `${(mx + ux * along + nx * side).toFixed(1)},${(my + uy * along + ny * side).toFixed(1)}`;
+      const head = (k) => {
+        const m = bez(k);
+        let tx = 2 * (1 - k) * (C.x - P0.x) + 2 * k * (P1.x - C.x), ty = 2 * (1 - k) * (C.y - P0.y) + 2 * k * (P1.y - C.y);
+        const tl = Math.hypot(tx, ty) || 1;
+        tx /= tl; ty /= tl;
+        const sx = -ty, sy = tx;
+        const pt = (along, side) => `${(m.x + tx * along + sx * side).toFixed(1)},${(m.y + ty * along + sy * side).toFixed(1)}`;
         heads.push(`<path class="head" d="M${pt(5, 0)}L${pt(-4, 4)}L${pt(-4, -4)}Z"/>`);
       };
-      if (linkProgress < 1 || reduceMotion.matches) { head(len / 2); continue; }
-      const offset = ((performance.now() / 1000) * FLOW_SPEED) % FLOW_SPACING;
-      for (let t = r + 8 + offset; t < len - r - 8; t += FLOW_SPACING) head(t);
+      if (linkProgress < 1 || reduceMotion.matches) { head(0.5); continue; }
+      const [A, B] = f.geometry.coordinates, Lm = metresBetween(A, B);
+      const metresPerPx = (40075016.686 * Math.cos((A[1] * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
+      if (FLOW_SPACING_M / metresPerPx < 24) { head(0.5); continue; } // zoomed too far out for a stream
+      const offsetM = ((performance.now() / 1000) * FLOW_SPEED_M) % FLOW_SPACING_M;
+      for (let tm = offsetM; tm < Lm; tm += FLOW_SPACING_M) {
+        const k = tm / Lm, c = [A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k];
+        if (front(c) <= 0) continue; // behind the camera
+        const q = map.project(c), t = (q.x - a.x) * ux + (q.y - a.y) * uy; // along the straight line, as a share of the curve
+        const kc = (t - r) / L;
+        if (kc > 8 / L && kc < 1 - 8 / L) head(kc);
+      }
     }
     linkSvg.innerHTML = lines.join("") + heads.join("");
     // Keep the stream moving while there are full lines to flow along.
@@ -1203,6 +1299,12 @@ export async function createMap(opts) {
   const cascadeHidden = { "impact-buildings": [], "impact-facilities": [], "impact-flooded": [] };
   const cascadeData = { "impact-buildings": impactBuildings, "impact-facilities": impactFacilities, "impact-flooded": floodedBuildings };
   let cascadeCutoff;
+  function applyNeutralFacilities() {
+    for (const id of ["cascade-facilities-indirect", "cascade-facilities-indirect-icon"]) {
+      const on = neutralIndirect || (layerFlags.indirectImpacts ?? visibleAt("indirectImpacts") === "visible");
+      setVisible(id, on);
+    }
+  }
   function syncCascadeTime() {
     const cutoff = floodId === "arrival_first" ? Math.round((time - BREACH_HOURS) * 100) / 100 : Infinity;
     if (cutoff === cascadeCutoff) return;
@@ -1211,7 +1313,7 @@ export async function createMap(opts) {
     for (const [source, data] of Object.entries(cascadeData)) {
       data.features.forEach((f, id) => {
         const h = f.properties.impact_h;
-        const hidden = h != null && h > cutoff;
+        const hidden = (source === "impact-facilities" && neutralIndirect && f.properties.tier >= 2) || (h != null && h > cutoff);
         if (hidden === (cascadeHidden[source][id] ?? false)) return;
         cascadeHidden[source][id] = hidden;
         // Facilities stay on the map, grey ("pending") until affected.

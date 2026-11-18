@@ -1,9 +1,9 @@
 /* Layer panel (panel.js). Colours share names with the "Story UI"
    variables in Figma (panel/bg there is --panel-bg here). */
-:root { --panel-bg: #ffffff; --panel-text: #222222; --panel-muted: #666666; --panel-border: #e3e3e3; }
+:root { --chevron-right: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 6l6 6l-6 6'/></svg>"); /* Tabler chevron-right, drawn with a mask in the colour of the text */ --panel-bg: #ffffff; --panel-text: #222222; --panel-muted: #666666; --panel-border: #e3e3e3; }
 .layer-panel {
   position: absolute; top: 10px; left: 10px; z-index: 1;
-  display: flex; flex-direction: column; gap: 10px; width: 254px;
+  display: flex; flex-direction: column; gap: 10px; width: 294px; /* the cards under the product name, 10 px from the edge (Figma comment, Nov 19) */
   font: 13px/1.4 system-ui, sans-serif; color: var(--panel-text);
 }
 .layer-panel .panel-card {
@@ -11,36 +11,33 @@
   background: color-mix(in srgb, var(--panel-bg) 95%, transparent); border-radius: 6px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
-.layer-panel h2 { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--panel-muted); }
+.layer-panel h2 { margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--panel-muted); }
+:is(.layer-panel, .flood-control) h2.layer-title { margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #000000; }
+:is(.layer-panel, .flood-control) h2.layer-title[hidden] { display: none; }
+/* A rule across the card between the layer's legend and the layer toggle (Figma comment, Nov 19) */
+.layer-panel hr.rule, .flood-control hr.rule { margin: 10px -12px 10px; border: 0; border-top: 1px solid #c4c4c4; }
 .layer-panel section + section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
 .layer-panel label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .layer-panel label.disabled { cursor: default; opacity: 0.5; }
-.layer-panel input[type=range] { width: 100%; margin: 4px 0 0; }
 .layer-panel .advance { margin-top: 6px; }
 .layer-panel .advance[hidden] { display: none; }
-.layer-panel .clock { display: flex; align-items: center; gap: 8px; }
-.layer-panel .clock button { width: 28px; height: 24px; border: 1px solid #bbb; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; }
-.layer-panel .clock strong { font-variant-numeric: tabular-nums; }
-.layer-panel .ticks { position: relative; height: 12px; font-size: 10px; color: #888; }
-.layer-panel .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 /* Segmented toggle for the flood layer (Figma: like the toolbar's audience switch).
    Pages can colour it with --segment-* (story 1 uses the slate scheme). */
-.layer-panel .segmented { display: flex; gap: 1px; }
-.layer-panel .segmented button {
-  flex: 1; height: 24px; padding: 0 8px; border: 0; border-radius: 0; background: var(--segment-bg, #8d8d8d); color: var(--segment-text, #000000);
-  font: 15px/1.22 Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap;
-}
-.layer-panel .segmented button[aria-pressed="false"] { background: var(--segment-off-bg, #8d8d8d); color: var(--segment-off-text, #000000); opacity: var(--segment-off-opacity, 0.5); }
+.layer-panel .segmented.button-group { display: flex; width: 100%; }
+.layer-panel .segmented .btn { flex: 1; }
+/* Basecoat buttons used as toggles (aria-pressed): the pressed one is solid. A page can recolour
+   it with --segment-bg / --segment-text. */
+.btn[data-variant][aria-pressed="true"], .btn[data-variant][aria-pressed="true"]:hover { background-color: var(--segment-bg, var(--color-primary)); color: var(--segment-text, var(--color-primary-foreground)); cursor: default; }
 /* Stepped scale for depth and velocity (legend("depth"), legend("velocity")) */
 .legend .scale { flex: 1 1 100%; padding: 2px 0 0; }
 .legend .scale .bar { display: flex; gap: 1px; height: 10px; }
 .legend .scale .bar i { flex: 1; width: auto; height: auto; border-radius: 0; }
-.legend .scale .ticks { position: relative; height: 14px; margin-top: 2px; font-size: 11px; color: #555; }
+.legend .scale .ticks { position: relative; height: 14px; margin-top: 2px; font-size: 12px; color: #555; }
 .legend .scale .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .legend .scale .ticks span:last-child { transform: translateX(-30%); }
 /* Impact tiers: stacked blocks with a 7 px bar in the tier colour (tierLegend in panel.js; story 4's map legend too) */
 .tier-legend { display: flex; flex-direction: column; gap: 1px; margin-top: 10px; }
-.tier-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-left: 7px solid var(--bar); font: 12px/1.25 Inter, system-ui, sans-serif; }
+.tier-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-left: 7px solid var(--bar); font: 14px/1.25 Inter, system-ui, sans-serif; }
 .tier-item[hidden] { display: none; }
 .tier-item strong { font-weight: 700; color: #000000; }
 .tier-item span { color: #555555; }
@@ -62,3 +59,31 @@
 .layer-panel .switch:checked { box-shadow: inset 0 0 0 1.5px var(--segment-bg, #4a5d70); }
 .layer-panel .switch:checked::before { transform: translateX(12px); background: var(--segment-bg, #4a5d70); }
 .layer-panel .switch:focus-visible { outline: 2px solid var(--segment-bg, #4a5d70); outline-offset: 2px; }
+
+.flood-control hr.rule { margin: 2px -10px; }
+
+/* Time slider (timeline.js; Figma 559:388): the track with the played part and a grabber, the breach marked
+   by a red line running below the track to its "Breach" label, the time right of the playhead (left of the slider once it no longer fits), play button beside */
+.timeline-row { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; }
+.timeline { --f: 0; --b: 0.5; position: relative; flex: 1; min-width: 0; height: 33px; margin-bottom: 18px; }
+.timeline .breach-label { position: absolute; left: calc(10px + var(--b) * (100% - 20px) + 6px); top: 36px; font-size: 13px; line-height: 16px; color: #555555; white-space: nowrap; }
+.timeline .track { position: absolute; inset: 0; border-radius: 4px; background: #e5eef3; }
+.timeline .fill { position: absolute; left: 0; top: 0; bottom: 0; box-sizing: border-box; width: calc(10px + var(--f) * (100% - 20px)); border: 1px solid #96b7c8; border-radius: 4px 0 0 4px; background: #acd1e4; }
+.timeline .grabber { position: absolute; right: -10px; top: -1px; bottom: -1px; width: 20px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 2px; border: 1px solid #96b7c8; border-radius: 4px; background: #ffffff; z-index: 2; }
+.timeline .grabber b { width: 2px; height: 15px; border-radius: 9px; background: #778593; }
+.timeline .breach-line { position: absolute; left: calc(10px + var(--b) * (100% - 20px) - 1px); top: 0; bottom: -17px; width: 2px; background: #d12b2b; z-index: 1; }
+.timeline .clock-time { position: absolute; right: 8px; top: 0; line-height: 33px; font: 400 16px/33px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #222222; pointer-events: none; z-index: 1; }
+.timeline.text-left .clock-time { right: auto; left: 8px; }
+.timeline input.time { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; -webkit-appearance: none; appearance: none; background: transparent; }
+.timeline input.time::-webkit-slider-runnable-track { height: 33px; background: transparent; }
+.timeline input.time::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 33px; }
+.timeline input.time::-moz-range-track { height: 33px; background: transparent; }
+.timeline input.time::-moz-range-thumb { width: 20px; height: 33px; border: 0; }
+.timeline-row .btn.play { flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid #bbbbbb; border-radius: 8px; background: #ffffff; box-shadow: none; }
+.timeline-row .btn.play:hover { background: #f3f3f3; }
+.timeline:has(input.time:focus-visible) .track { outline: 2px solid #4a5d70; outline-offset: 2px; }
+.timeline-row .btn.play svg { width: 11px; height: 12px; flex: none; } /* Basecoat sizes button icons at 16px; these are 11 x 12 */
+
+/* USACE step 2: the flood slider alone (story.js setTransition) */
+.layer-panel.slider-only .segmented, .layer-panel.slider-only hr.rule, .layer-panel.slider-only .panel-card:not(:first-child) { display: none; }
+.timeline input.time:disabled { cursor: default; }
