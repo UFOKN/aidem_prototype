@@ -86,10 +86,15 @@ function advanceRamp(t) {
 
 // Evacuation zones (v2: two zones).
 export const ZONES = {
-  1: { color: "#d7301f" },
-  2: { color: "#fc8d59" },
+  // Orange and mustard: warm, so they stay clear of the flood's blues, and
+  // echo story 4's notice colours (orders red-orange, notifications yellow).
+  // Mostly opaque: a light fill washes out over the flood water. Zone 1,
+  // almost wholly over the water, a little stronger.
+  1: { color: "#de1a00", opacity: 0.7 },
+  2: { color: "#e8a630", opacity: 0.5 }, // warm yellow, not greenish (colour blindness); lighter than zone 1
 };
 const zoneColor = ["match", ["get", "Zone"], ...Object.entries(ZONES).flatMap(([z, v]) => [+z, v.color]), "#999"];
+const zoneOpacity = ["match", ["get", "Zone"], ...Object.entries(ZONES).flatMap(([z, v]) => [+z, v.opacity ?? 0.3]), 0.3];
 // Selected zone: the same hue, darkened, at a stronger fill.
 const darken = (hex, k = 0.7) => "#" + hex.slice(1).match(/../g).map((c) => Math.round(parseInt(c, 16) * k).toString(16).padStart(2, "0")).join("");
 const zoneColorDark = ["match", ["get", "Zone"], ...Object.entries(ZONES).flatMap(([z, v]) => [+z, darken(v.color)]), "#666"];
@@ -117,7 +122,7 @@ const OFF_BY_DEFAULT = ["directImpacts", "indirectImpacts"];
 // hospital): a white glyph (422:1308-1310, drawn from these SVG paths) over the
 // facility's circle, which keeps its status colour. Types without an icon
 // stay a plain circle.
-const FACILITY_ICONS = {
+export const FACILITY_ICONS = {
   energy: { types: ["Electric Power Generation", "Electric Substations"], w: 11.55, h: 14.85, d: "M6.6 0V5.775H11.55L4.95 14.85V9.075H0L6.6 0Z" },
   school: { types: ["Schools", "Colleges and Universities"], w: 16.5, h: 12.75, d: "M13.5 9.74983C13.4997 10.7742 12.7042 11.5432 11.7676 12.0116C10.7957 12.4975 9.5298 12.7498 8.25 12.7498C6.9702 12.7498 5.70433 12.4975 4.73242 12.0116C3.79583 11.5432 3.00025 10.7742 3 9.74983V7.06721L7.98535 8.95198C8.15701 9.01673 8.34717 9.01651 8.51855 8.951L13.5 7.04671V9.74983ZM8.1084 0.0135037C8.24839 -0.0134153 8.39412 -9.75601e-05 8.52832 0.0535428L16.0283 3.05354C16.3131 3.16744 16.5 3.44316 16.5 3.74983V8.24983C16.5 8.66405 16.1642 8.99983 15.75 8.99983C15.3358 8.99983 15 8.66405 15 8.24983V4.85725L13.9961 5.25764C13.9656 5.26507 13.9353 5.27449 13.9053 5.28596L8.24805 7.4471L3.03418 5.47737C3.03479 5.47541 3.0355 5.47347 3.03613 5.47151L0.47168 4.44612C0.186937 4.33222 0 4.05651 0 3.74983C1.93493e-06 3.44316 0.186937 3.16744 0.47168 3.05354L7.97168 0.0535428L8.1084 0.0135037Z" },
   hospital: { types: ["Hospitals"], w: 12.65, h: 13.5, d: "M7.07098 0C7.26989 0 7.46066 0.0790176 7.60131 0.21967C7.74196 0.360322 7.82098 0.551088 7.82098 0.75V4.15125L10.767 2.451C10.9392 2.35155 11.1439 2.3246 11.3361 2.37608C11.5282 2.42755 11.692 2.55325 11.7915 2.7255L12.5415 4.0245C12.6409 4.19676 12.6679 4.40147 12.6164 4.5936C12.5649 4.78573 12.4392 4.94954 12.267 5.049L9.32173 6.75L12.267 8.45175C12.4392 8.55121 12.5649 8.71502 12.6164 8.90715C12.6679 9.09928 12.6409 9.30399 12.5415 9.47625L11.7915 10.7753C11.692 10.9475 11.5282 11.0732 11.3361 11.1247C11.1439 11.1762 10.9392 11.1492 10.767 11.0497L7.82098 9.348V12.75C7.82098 12.9489 7.74196 13.1397 7.60131 13.2803C7.46066 13.421 7.26989 13.5 7.07098 13.5H5.57098C5.37207 13.5 5.1813 13.421 5.04065 13.2803C4.9 13.1397 4.82098 12.9489 4.82098 12.75V9.348L1.87498 11.049C1.70272 11.1485 1.49801 11.1754 1.30588 11.1239C1.11375 11.0724 0.949939 10.9468 0.850479 10.7745L0.100479 9.4755C0.00102763 9.30324 -0.0259233 9.09853 0.0255551 8.9064C0.0770335 8.71427 0.202725 8.55046 0.374979 8.451L3.32023 6.75L0.374979 5.049C0.202725 4.94954 0.0770335 4.78573 0.0255551 4.5936C-0.0259233 4.40147 0.00102763 4.19676 0.100479 4.0245L0.850479 2.7255C0.949939 2.55325 1.11375 2.42755 1.30588 2.37608C1.49801 2.3246 1.70272 2.35155 1.87498 2.451L4.82098 4.15125V0.75C4.82098 0.551088 4.9 0.360322 5.04065 0.21967C5.1813 0.0790176 5.37207 0 5.57098 0H7.07098Z" },
@@ -126,6 +131,11 @@ const facilityIcon = ["match", ["get", "type"], ...Object.entries(FACILITY_ICONS
 // Circle and icon sizes: the icon frame is 24 px with the glyph inside.
 const FACILITY_RADIUS = ["interpolate", ["linear"], ["zoom"], 9, 8, 14, 12];
 const FACILITY_ICON_SIZE = ["interpolate", ["linear"], ["zoom"], 9, 8 / 12, 14, 1];
+/** A facility icon's glyph as inline SVG (fill: currentColor), e.g. for headings. */
+export const facilityIconSvg = (key) => {
+  const g = FACILITY_ICONS[key];
+  return g ? `<svg class="facility-icon" viewBox="0 0 ${g.w} ${g.h}" width="${g.w}" height="${g.h}" aria-hidden="true"><path fill="currentColor" d="${g.d}"/></svg>` : "";
+};
 function facilityGlyph(key) {
   const g = FACILITY_ICONS[key], ratio = 2;
   const canvas = document.createElement("canvas");
@@ -149,12 +159,13 @@ export function setImpactTiers(tiers) {
   for (const [t, v] of Object.entries(tiers)) Object.assign(IMPACT_TIERS[t], v);
 }
 export const IMPACT_TIERS = {
-  // One warm sequence, darkest at the flood; tier 3 has an outline so its
-  // light dots hold up on the white map. Story 3 reads these too.
-  1: { label: "Flooded", color: "#bf094c" },
+  // Darkest at the flood (plum, so it stays apart from the pink tier 2 for
+  // colour-blind readers too); tier 3's light amber has a dark outline that
+  // carries it on the white map and the blue flood. Story 3 reads these too.
+  1: { label: "Flooded", color: "#7a0177" },
   // "Indirect impacts" is the umbrella for tiers 2 and 3 (layer group, sidebar).
-  2: { label: "Loss of service", note: "Depends on flooded facility", color: "#eb5577" },
-  3: { label: "Cascading loss of service", note: "Depends on facility that lost service", color: "#f4a661", stroke: "#b46c39" },
+  2: { label: "Loss of service", note: "Depends on flooded facility", color: "#d6336c" },
+  3: { label: "Cascading loss of service", note: "Depends on facility that lost service", color: "#f39c12", stroke: "#9a5b00" },
 };
 // Colours of the failed utilities, by what they provide (legend only; the
 // cascade arrows are black).
@@ -165,14 +176,20 @@ export const UTILITY_AREAS = {
 };
 const tierColor = (prop) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, v.color]), "#999"];
 const SELECTED_OPACITY = 0.9; // buildings of the selected facility
-// An optional outline per tier (IMPACT_TIERS[t].stroke, 1 px). Its opacity
-// follows the dot's (setDotOpacity).
-const tierStroke = () => {
-  const withStroke = Object.entries(IMPACT_TIERS).filter(([, v]) => v.stroke);
-  return withStroke.length ? {
-    "circle-stroke-color": ["match", ["get", "tier"], ...withStroke.flatMap(([t, v]) => [+t, v.stroke]), "rgba(0,0,0,0)"],
-    "circle-stroke-width": ["match", ["get", "tier"], ...withStroke.flatMap(([t]) => [+t, 1]), 0],
-  } : {};
+// An optional outline per tier (IMPACT_TIERS[t].stroke). It thins out as the
+// map zooms out (none at zoom 10 and below, 1 px from 15), and the outlined
+// dots are drawn smaller by the outline's width, so all dots are the same size.
+// Its opacity follows the dot's (setDotOpacity). stops: [[zoom, radius], ...].
+const strokeWidthAt = (z) => Math.min(1, Math.max(0, (z - 10) / 5));
+const tierDot = (stops) => {
+  const withStroke = Object.entries(IMPACT_TIERS).filter(([, v]) => v.stroke).map(([t]) => +t);
+  const zoomed = (f) => ["interpolate", ["linear"], ["zoom"], ...stops.flatMap(([z, r]) => [z, f(z, r)])];
+  if (!withStroke.length) return { "circle-radius": zoomed((z, r) => r) };
+  return {
+    "circle-radius": zoomed((z, r) => ["match", ["get", "tier"], withStroke, Math.max(0.3, r - strokeWidthAt(z)), r]),
+    "circle-stroke-color": ["match", ["get", "tier"], ...Object.entries(IMPACT_TIERS).filter(([, v]) => v.stroke).flatMap(([t, v]) => [+t, v.stroke]), "rgba(0,0,0,0)"],
+    "circle-stroke-width": zoomed((z) => ["match", ["get", "tier"], withStroke, strokeWidthAt(z), 0]),
+  };
 };
 // Impact buildings: hidden until their time (feature state "hidden"), faded
 // while a facility's own buildings show (feature state "dim"). k (0-1) is how
@@ -190,6 +207,7 @@ const FACILITY_PENDING = "#b0b0b0"; // facilities not yet affected (flood advanc
 const DAM_COLOR = "#f0806f";
 // Rivers, lakes and the reservoir.
 const WATER = "#6baed6";
+const WATER_LABEL = "#08519c"; // same blue ramp as WATER, dark
 // River centrelines drawn on top of everything but labels, so the river
 // paths stay visible through the flood.
 const RIVER_LINE = "#2171b5";
@@ -297,7 +315,8 @@ export function facilityPopupHtml(p, links = []) {
  * @param {boolean} [opts.hash=false]       keep the view in the URL (#zoom/lat/lng/...)
  * @param {string|null} [opts.flood="depth_max"]  initial flood layer
  * @param {object} [opts.layers]            initial visibility per LAYER_GROUPS name, e.g. { buildings: false }
- * @param {boolean} [opts.zonePopup=true]   click a zone for its impact summary
+ * @param {boolean|string} [opts.zonePopup=true]   click a zone for its impact summary;
+ *   "select" selects it without the popup (the page shows the details)
  * @param {boolean} [opts.facilityPopup=true] click a facility for a popup; false leaves the details
  *   to the page (listen to the "facility" event, look up with app.facilityInfo(name))
  * @param {boolean} [opts.controls=true]    zoom/compass and scale controls
@@ -378,8 +397,9 @@ export async function createMap(opts) {
   }
   const visibleAt = (group) => (layers[group] ?? !OFF_BY_DEFAULT.includes(group) ? "visible" : "none");
 
-  // Basemap flavor (Protomaps), with our water colour.
-  const flavor = { ...basemaps.namedFlavor(FLAVOR), water: WATER };
+  // Basemap flavor (Protomaps), with our water colour and dark blue water
+  // labels (rivers, lakes; ocean_label drives all three label layers).
+  const flavor = { ...basemaps.namedFlavor(FLAVOR), water: WATER, ocean_label: WATER_LABEL };
   // The basemap's sparse OSM buildings are replaced with Overture footprints.
   const baseLayers = basemaps.layers("protomaps", flavor, { lang: "en" }).filter((l) => l.id !== "buildings");
   // Hillshade goes on land/landuse, under water, roads and buildings.
@@ -497,10 +517,12 @@ export async function createMap(opts) {
           paint: { "fill-color": WATER },
         },
         ...rasterLayers.filter((l) => OVER_WATER.includes(l.id)),
+        // Evacuation zones: above every flood layer and the rivers and water
+        // areas, under the thin river line (river-path), buildings and labels
         {
           id: "evac-fill", type: "fill", source: "evac",
           layout: { visibility: visibleAt("evac") },
-          paint: { "fill-color": zoneColor, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.5, 0.3] },
+          paint: { "fill-color": zoneColor, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], ["+", zoneOpacity, 0.2], zoneOpacity] },
         },
         {
           id: "evac-selected-fill", type: "fill", source: "evac", filter: ["==", ["id"], -1],
@@ -556,11 +578,10 @@ export async function createMap(opts) {
           layout: { visibility: visibleAt("indirectImpacts"), "circle-sort-key": ["-", 0, ["get", "tier"]] },
           paint: {
             "circle-color": tierColor("tier"),
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
+            ...tierDot([[9, 0.8], [12, 1.6], [15, 3.5]]),
             // Hidden until its impact time (feature state, see syncCascadeTime)
             "circle-opacity": indirectOpacity(),
             "circle-stroke-opacity": indirectOpacity(),
-            ...tierStroke(),
           },
         },
         {
@@ -608,10 +629,9 @@ export async function createMap(opts) {
           layout: { visibility: "none", "circle-sort-key": ["-", 0, ["get", "tier"]] }, // nearer tiers on top
           paint: {
             "circle-color": tierColor("tier"),
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1, 12, 2, 15, 4],
+            ...tierDot([[9, 1], [12, 2], [15, 4]]),
             "circle-opacity": SELECTED_OPACITY,
             "circle-stroke-opacity": SELECTED_OPACITY,
-            ...tierStroke(),
           },
         },
         // Affected facilities, above the labels so they stay clickable: direct
@@ -977,7 +997,7 @@ export async function createMap(opts) {
       if (facilityAt(e.point)) return; // the facility popup has it
       const hit = map.getLayoutProperty("evac-fill", "visibility") !== "none"
         && map.queryRenderedFeatures(e.point, { layers: ["evac-fill"] })[0];
-      if (hit) app.selectZone(hit.id, { popup: e.lngLat });
+      if (hit) app.selectZone(hit.id, zonePopup === "select" ? {} : { popup: e.lngLat });
       else if (selectedZone != null) app.selectZone(null);
     });
     // Hover: stronger fill and outline on the zone under the cursor; the
@@ -989,7 +1009,7 @@ export async function createMap(opts) {
       if (zone != null) map.setFeatureState({ source: "evac", id: zone }, { hover: true });
       hovered = zone;
       const hover = ["boolean", ["feature-state", "hover"], false];
-      map.setPaintProperty("evac-fill", "fill-opacity", ["case", hover, 0.5, zone != null ? 0.08 : 0.3]);
+      map.setPaintProperty("evac-fill", "fill-opacity", ["case", hover, ["+", zoneOpacity, 0.2], zone != null ? 0.08 : zoneOpacity]);
       map.setPaintProperty("evac-line", "line-opacity", ["case", hover, 1, zone != null ? 0.25 : 1]);
       map.getCanvas().style.cursor = zone != null ? "pointer" : "";
     };
@@ -1104,6 +1124,8 @@ export async function createMap(opts) {
   map.getCanvasContainer().appendChild(linkSvg);
   let selectedLinks = [];
   let linkProgress = 1; // how far along the arrows are drawn (setLinkProgress)
+  const FLOW_SPACING = 70, FLOW_SPEED = 30; // px between flowing arrowheads, px a second
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   // Radius of the rings around linked facilities (cascade-linked), plus a gap.
   const ringRadius = (z) => 11 + (Math.min(Math.max(z, 9), 14) - 9) * (4 / 5) + 2;
   function drawLinks() {
@@ -1124,13 +1146,24 @@ export async function createMap(opts) {
       if (end - r < 1) continue; // not started yet
       lines.push(`<path class="casing" d="M${p(r)}L${p(end)}"/><path class="line" d="M${p(r)}L${p(end)}"/>`);
       if (end < len / 2) continue; // the arrowhead appears once the line passes the middle
-      // Arrowhead at the middle, pointing from provider to facility.
-      const mx = a.x + dx / 2, my = a.y + dy / 2, nx = -uy, ny = ux;
-      const pt = (along, side) => `${(mx + ux * along + nx * side).toFixed(1)},${(my + uy * along + ny * side).toFixed(1)}`;
-      heads.push(`<path class="head" d="M${pt(5, 0)}L${pt(-4, 4)}L${pt(-4, -4)}Z"/>`);
+      // Arrowheads pointing from provider to facility: one at the middle
+      // while the line grows (or with reduced motion), then a stream of them
+      // flowing along it.
+      const nx = -uy, ny = ux;
+      const head = (t) => {
+        const mx = a.x + ux * t, my = a.y + uy * t;
+        const pt = (along, side) => `${(mx + ux * along + nx * side).toFixed(1)},${(my + uy * along + ny * side).toFixed(1)}`;
+        heads.push(`<path class="head" d="M${pt(5, 0)}L${pt(-4, 4)}L${pt(-4, -4)}Z"/>`);
+      };
+      if (linkProgress < 1 || reduceMotion.matches) { head(len / 2); continue; }
+      const offset = ((performance.now() / 1000) * FLOW_SPEED) % FLOW_SPACING;
+      for (let t = r + 8 + offset; t < len - r - 8; t += FLOW_SPACING) head(t);
     }
     linkSvg.innerHTML = lines.join("") + heads.join("");
+    // Keep the stream moving while there are full lines to flow along.
+    if (!flowFrame && heads.length && linkProgress >= 1 && !reduceMotion.matches) flowFrame = requestAnimationFrame(() => { flowFrame = 0; drawLinks(); });
   }
+  let flowFrame = 0;
   map.on("render", () => { if (selectedLinks.length) drawLinks(); });
 
   // map.project() clamps points behind the camera, which would point a line

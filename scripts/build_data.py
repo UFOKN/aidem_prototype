@@ -413,6 +413,22 @@ def build_cascade() -> None:
             for pid in (caused_by or "").split(";"):
                 if pid and pid != "flood":
                     by_provider.setdefault(pid, {}).setdefault(tier, []).append([round(pt.x, 5), round(pt.y, 5)])
+    # Flooded buildings also lose their providers' services, but the cascade
+    # lists each building once, in its first tier, so the secondary and
+    # tertiary tables leave them out. Add the flooded buildings inside each
+    # provider's service area (tier 1), so a selected facility shows every
+    # building it serves.
+    from shapely.geometry import shape
+    from shapely.prepared import prep
+    flooded = []
+    for (blob,) in con.execute('SELECT geom FROM "primary"'):
+        envelope = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}[(blob[3] >> 1) & 7]
+        flooded.append(from_wkb(bytes(blob[8 + envelope:])))
+    for a in areas:
+        pid, poly = a["properties"]["pid"], prep(shape(a["geometry"]))
+        inside = [[round(p.x, 5), round(p.y, 5)] for p in flooded if poly.contains(p)]
+        if inside:
+            by_provider.setdefault(pid, {})[1] = inside
     con.close()
     folder = OUT / "cascade_by_provider"
     shutil.rmtree(folder, ignore_errors=True)

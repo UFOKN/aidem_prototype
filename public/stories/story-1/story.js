@@ -3,6 +3,7 @@
 
 import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, clock, facilityName } from "../../map/core.js";
 import { createPanel } from "../../map/panel.js";
+import { directTables, indirectTables, floodTables, toggleUses } from "../summary.js";
 
 // Opening view on the South Fork Dam (from the explorer's URL
 // #16.72/40.348515/-78.774338/176.3/60: zoom/lat/lng/bearing/pitch).
@@ -341,28 +342,15 @@ function hideTools() {
 }
 
 // --- Sidebar ---------------------------------------------------------------
-// Scenario summary. Zone figures are LifeSim results, summed over the three
-// evacuation zones (each life loss figure is a mean for one scenario, so
-// zones add up within a column). Flood figures come from the flood rasters
-// (Depth/Velocity/Arrival Time, computed once from the source GeoTIFFs).
+// Scenario summary. The sections' tables come from ../summary.js, shared with
+// story 4: LifeSim results summed over the evacuation zones, the cascade
+// summary, and flood figures from the flood rasters.
 
 const sidebar = document.querySelector(".sidebar");
 // Rows that open the buildings by use (indirect impacts).
-sidebar.addEventListener("click", (e) => {
-  const expand = e.target.closest(".expand");
-  if (!expand) return;
-  const open = expand.getAttribute("aria-expanded") !== "true", tier = expand.closest("tr").dataset.tier;
-  expand.setAttribute("aria-expanded", open);
-  for (const tr of expand.closest("table").querySelectorAll(`tr.use[data-tier="${tier}"]`)) tr.hidden = !open;
-});
+sidebar.addEventListener("click", toggleUses);
 const card = document.querySelector(".card");
 new ResizeObserver(() => document.body.style.setProperty("--card-height", `${card.offsetHeight}px`)).observe(card);
-const FLOOD_FACTS = {
-  areaSqMi: 4.9,        // cells with depth > 0
-  maxDepth: 79,         // ft
-  medianDepth: 16,      // ft, over the flooded area
-  velocityP99: 25,      // ft/s; the raw maximum is a spike at the breach
-};
 
 // Facility details: clicking a facility on the map shows them over the
 // summary; closing them (or clicking elsewhere on the map) brings it back.
@@ -419,100 +407,40 @@ function facilityHtml(p) {
 }
 
 function sidebarHtml() {
-  const z = Object.keys(ZONES).map((n) => app.zoneStats(+n));
-  const sum = (k) => z.reduce((a, p) => a + p[k], 0);
-  const n = (v) => Math.round(v).toLocaleString("en-US");
-  const collapse = z.reduce((a, p) => a + p.All_Collps, 0); // counts of structures (zones v2)
-  const row = (label, value, cls = "") => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
-  const swatch = (zone) => `<i style="background:${ZONES[zone].color}"></i>`;
-  const f = FLOOD_FACTS;
+  const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   return `<div class="scroll">
     <section>
-    <h2>Direct impacts</h2>
-    <table class="cols">
-      <thead><tr><th>Population at risk</th><th></th></tr></thead>
-      <tr><td>In the flood zone</td><td>${n(sum("PAR_Day"))}</td></tr>
-    </table>
-    <table class="cols">
-      <thead><tr><th>Life loss</th><th></th></tr></thead>
-      <tr><td>0–2 h warning</td><td>${n(sum("LL_D_Min"))}</td></tr>
-      <tr><td>2–6 h warning</td><td>${n(sum("LL_D_Amp"))}</td></tr>
-    </table>
-    <table>
-      ${row("Structures flooded", n(sum("All_Struct")))}
-      ${row("of which critical", n(sum("Crt_Struct")), "sub")}
-      ${row("Likely to collapse", n(collapse))}
-      ${impacts ? row("Facilities flooded (2 ft+)", n(impacts.facilities.primary.first_affected.count)) : ""}
-    </table>
-    </section>
-    <section class="indirect"></section>
-    <section>
     <h2>Flood modeling</h2>
-    <table>
-      ${row("Overtopping starts", clock(0))}
-      ${row("Dam breach", clock(BREACH_HOURS))}
-      ${row("Flooded area", `${f.areaSqMi} sq mi`)}
-      ${row("Depth", `up to ${f.maxDepth} ft, median ${f.medianDepth} ft`)}
-      ${row("Velocity", `up to ${f.velocityP99} ft/s`)}
-    </table>
-    </section></div>`;
+    ${floodTables()}
+    </section>
+    <section>
+    <h2>Direct impacts</h2>
+    ${directTables(zones, impacts)}
+    </section>
+    <section class="indirect"></section></div>`;
 }
 
 // Cascading impacts from the analysis's summary (round 2). Buildings and
 // people are counted once, in the first tier where they lose something, so
 // the tiers add up; facilities likewise. Primary buildings are any that get
 // wet (NSI), so the count differs from LifeSim's structures above.
-// indirectLifeLoss: LifeSim's indirect life loss, summed over the zones.
 // Indirect impacts section of the summary. Until the cascade has been
 // calculated (step 3) it only holds the button that calculates it.
 function syncIndirect() {
   const el = sidebar.querySelector("section.indirect");
   if (!el) return;
-  const z = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   el.outerHTML = current >= 2
-    ? impactsHtml(z.reduce((a, p) => a + p.Ind_LL, 0))
+    ? impactsHtml()
     : `<section class="indirect"><h2>Indirect impacts</h2><button class="calculate">Calculate cascading impacts</button></section>`;
   sidebar.querySelector("section.indirect .calculate")?.addEventListener("click", () => go(2));
   if (app.facility) renderDetail();
 }
 
-function impactsHtml(indirectLifeLoss) {
-  const n = (v) => Math.round(v).toLocaleString("en-US");
-  const row = (label, value, cls = "") => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
-  if (!impacts) {
-    return `<section class="indirect"><h2>Indirect impacts</h2><table>${row("Cascading impacts", `<span class="na">not loaded</span>`)}${row("Indirect life loss", n(indirectLifeLoss))}</table></section>`;
-  }
-  const b = impacts.buildings, fac = impacts.facilities;
-  const first = (tier) => b[tier].first_affected;
-  // Flooded buildings are listed with the direct impacts.
-  const tiers = [["secondary", 2], ["tertiary", 3]];
-  const total = (k) => tiers.reduce((a, [t]) => a + first(t)[k], 0);
-  const swatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}${IMPACT_TIERS[i].stroke ? `; box-shadow: inset 0 0 0 1px ${IMPACT_TIERS[i].stroke}` : ""}"></i>`;
+function impactsHtml() {
+  const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   return `<section class="indirect">
     <h2>Indirect impacts</h2>
-    <table class="cols">
-      <thead><tr><th>Impact</th><th>People</th></tr></thead>
-      ${tiers.map(([t, i]) => `<tr><td>${swatch(i)}${IMPACT_TIERS[i].label}</td><td>${n(first(t).pop_day)}</td></tr>`).join("")}
-      <tr><td>All</td><td>${n(total("pop_day"))}</td></tr>
-    </table>
-    <table class="cols expandable">
-      <thead><tr><th>Impact</th><th>Buildings</th></tr></thead>
-      ${tiers.map(([t, i]) => {
-        const uses = useByTier?.[t];
-        const toggle = uses ? `<button class="expand" aria-expanded="false" aria-label="Show buildings by use"></button>` : "";
-        return `<tr data-tier="${t}"><td>${toggle}${swatch(i)}${IMPACT_TIERS[i].label}</td><td>${n(first(t).count)}</td></tr>`
-          + (uses ?? []).map((u) => `<tr class="use" data-tier="${t}" hidden><td>${u.use}</td><td>${n(u.buildings)}</td></tr>`).join("");
-      }).join("")}
-      <tr><td>All</td><td>${n(total("count"))}</td></tr>
-    </table>
-    <table>
-      ${row("Facilities losing a service", n(fac.secondary.first_affected.count))}
-      ${row("of which hospitals", n(fac.secondary.affected_by_type.Hospitals ?? 0), "sub")}
-      ${row("of which schools", n(fac.secondary.affected_by_type.Schools ?? 0), "sub")}
-    </table>
-    <table class="group">
-      ${row("Indirect life loss", n(indirectLifeLoss))}
-    </table>
+    ${indirectTables(zones, impacts, useByTier)}
     </section>`;
 }
 

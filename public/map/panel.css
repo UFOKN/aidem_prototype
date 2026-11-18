@@ -38,9 +38,27 @@
 .legend .scale .ticks { position: relative; height: 14px; margin-top: 2px; font-size: 11px; color: #555; }
 .legend .scale .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .legend .scale .ticks span:last-child { transform: translateX(-30%); }
-/* Impact tiers: stacked blocks with a 7 px bar in the tier colour (tierLegend in panel.js) */
-.layer-panel .tier-legend { display: flex; flex-direction: column; gap: 1px; margin-top: 10px; }
-.layer-panel .tier-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-left: 7px solid var(--bar); font: 12px/1.25 Inter, system-ui, sans-serif; }
-.layer-panel .tier-item[hidden] { display: none; }
-.layer-panel .tier-item strong { font-weight: 700; color: #000000; }
-.layer-panel .tier-item span { color: #555555; }
+/* Impact tiers: stacked blocks with a 7 px bar in the tier colour (tierLegend in panel.js; story 4's map legend too) */
+.tier-legend { display: flex; flex-direction: column; gap: 1px; margin-top: 10px; }
+.tier-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-left: 7px solid var(--bar); font: 12px/1.25 Inter, system-ui, sans-serif; }
+.tier-item[hidden] { display: none; }
+.tier-item strong { font-weight: 700; color: #000000; }
+.tier-item span { color: #555555; }
+/* Heading row with a switch on the right (one impacts toggle); the whole row is the label */
+.layer-panel .group-head { justify-content: space-between; margin: 0; }
+/* With every tier hidden (switch off) the legend takes no room */
+.layer-panel .tier-legend:not(:has(.tier-item:not([hidden]))) { display: none; }
+.layer-panel .group-head h2 { margin: 0; }
+/* Outlined track, filled knob: grey and left when off, slate and right when on */
+.layer-panel .switch {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative;
+  width: 26px; height: 14px; margin: 0; border-radius: 7px; background: none; cursor: inherit;
+  box-shadow: inset 0 0 0 1.5px #b0b0b0; transition: box-shadow 0.15s ease;
+}
+.layer-panel .switch::before {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%;
+  background: #b0b0b0; transition: transform 0.15s ease, background 0.15s ease;
+}
+.layer-panel .switch:checked { box-shadow: inset 0 0 0 1.5px var(--segment-bg, #4a5d70); }
+.layer-panel .switch:checked::before { transform: translateX(12px); background: var(--segment-bg, #4a5d70); }
+.layer-panel .switch:focus-visible { outline: 2px solid var(--segment-bg, #4a5d70); outline-offset: 2px; }

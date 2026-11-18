@@ -34,13 +34,18 @@ export function legend(kind) {
 
 // Impact tiers as stacked blocks with a coloured bar (Figma: Story 1 /
 // Step 3, layer panel). Each block shows while its layer group is on.
+// Story 4 draws its map legend from these blocks too.
+export const NOT_AFFECTED = { label: "Not affected", color: "#cccccc" };
+/** One block for a tier ({ label, note?, color }); group ties it to a layer group. */
+export const tierItem = (t, group) => `<div class="tier-item"${group ? ` data-group="${group}"` : ""} style="--bar:${t.color}"><strong>${t.label}</strong>${t.note ? `<span>${t.note}</span>` : ""}</div>`;
 const tierLegend = () => `<div class="tier-legend">
-  ${[[IMPACT_TIERS[1], "directImpacts"], [IMPACT_TIERS[2], "indirectImpacts"], [IMPACT_TIERS[3], "indirectImpacts"],
-    [{ label: "Not affected", color: "#cccccc" }, "directImpacts"]]
-    .map(([t, group]) => `<div class="tier-item" data-group="${group}" style="--bar:${t.color}"><strong>${t.label}</strong>${t.note ? `<span>${t.note}</span>` : ""}</div>`).join("")}
+  ${[[IMPACT_TIERS[1], "directImpacts"], [IMPACT_TIERS[2], "indirectImpacts"], [IMPACT_TIERS[3], "indirectImpacts"], [NOT_AFFECTED, "directImpacts"]]
+    .map(([t, group]) => tierItem(t, group)).join("")}
 </div>`;
 
-export function createPanel(app, { parent = document.body } = {}) {
+// oneImpactToggle: a single "Impacts" checkbox for both impact groups (story 5);
+// turned on, it shows the groups impactGroups() returns (the story's current ones).
+export function createPanel(app, { parent = document.body, evac = true, oneImpactToggle = false, impactGroups = () => ["directImpacts", "indirectImpacts"] } = {}) {
   const el = document.createElement("div");
   el.className = "layer-panel";
   // Two cards (Figma, Story 1 / Step 3): the flood layer, picked with a
@@ -70,15 +75,18 @@ export function createPanel(app, { parent = document.body } = {}) {
     </section>
     </div>
     <div class="panel-card">
-    <section>
+    ${evac ? `<section>
       <h2>Layers</h2>
       <label><input type="checkbox" data-group="evac"> Evacuation zones</label>
       <div class="legend" data-group="evac">${legend("zones")}</div>
-    </section>
+    </section>` : ""}
     <section>
-      <h2>Facilities and buildings</h2>
+      ${oneImpactToggle
+        // One toggle (story 5, story 4): a switch right of the heading; the whole row toggles
+        ? `<label class="group-head"><h2>Impacts</h2><input type="checkbox" class="impacts-toggle switch" role="switch" aria-label="Show impacts"></label>`
+        : `<h2>Facilities and buildings</h2>
       <label><input type="checkbox" data-group="directImpacts"> Direct impacts</label>
-      <label><input type="checkbox" data-group="indirectImpacts"> Indirect impacts</label>
+      <label><input type="checkbox" data-group="indirectImpacts"> Indirect impacts</label>`}
       ${tierLegend()}
     </section>
     </div>`;
@@ -111,11 +119,20 @@ export function createPanel(app, { parent = document.body } = {}) {
     syncGroup(box.dataset.group, isOn(box.dataset.group));
     box.addEventListener("change", () => app.setLayer(box.dataset.group, box.checked));
   }
-  app.on("layer", ({ name, on }) => syncGroup(name, on));
+  // The single impacts toggle: on while either group is on
+  const impactsBox = $(".impacts-toggle");
+  const syncImpacts = () => { if (impactsBox) impactsBox.checked = isOn("directImpacts") || isOn("indirectImpacts"); };
+  impactsBox?.addEventListener("change", () => {
+    const on = impactsBox.checked; // read once: each setLayer re-syncs the box
+    for (const g of ["directImpacts", "indirectImpacts"]) app.setLayer(g, on && impactGroups().includes(g));
+  });
+  syncImpacts();
+  // With one toggle there are no per-group boxes to sync the tier legend at start
+  if (impactsBox) for (const g of ["directImpacts", "indirectImpacts"]) syncGroup(g, isOn(g));
+  app.on("layer", ({ name, on }) => { syncGroup(name, on); syncImpacts(); });
   // While a facility is selected its impacts stay on: those toggles are locked.
   const syncLock = (name) => {
-    for (const group of ["directImpacts", "indirectImpacts"]) {
-      const box = el.querySelector(`input[data-group="${group}"]`);
+    for (const box of el.querySelectorAll('input[data-group="directImpacts"], input[data-group="indirectImpacts"], .impacts-toggle')) {
       box.disabled = !!name;
       box.closest("label").classList.toggle("disabled", !!name);
     }
