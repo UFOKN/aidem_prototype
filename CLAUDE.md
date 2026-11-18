@@ -2,12 +2,12 @@
 
 Flood scenario prototype for the South Fork Dam: MapLibre and PMTiles, static files in `public/`. README.md covers the data pipeline and pages. FIGMA.md maps every Figma frame to its code. Read both before changing either side.
 
-- Story 1 (`public/stories/story-1/`) is the USACE journey: a map story with a sidebar and a layer panel.
-- Story 3 (`public/stories/story-3/index.html`) is the current EM interface: an overview with cards plus subpages (`#flood`, `#people`, `#impacts`, `#plan`) that change in place. (Story 2, the first EM version, was removed; its Figma frames remain.)
-- Story 4 (`public/stories/story-4/index.html`) is a third EM version: a 50/50 split screen, live map left, report right; each heading opens its detail in place (risk overview, flooding, EAP, evacuation plan; the tab is internal state, the URL holds the story step `#1`–`#5`), and the map switches to that detail's layers. The risk overview combines direct and indirect impacts (tier table, a clickable flood timeline with the cascade as a tree, life loss); the separate Direct and Indirect impacts pages were removed (Nov 2026). The flooding facts come from `public/stories/summary.js`, shared with story 1's sidebar. Story 5 links to it and back.
-- Story 5 (`public/stories/story-5/`) started as a copy of story 1 with the sidebar on the right and the layer panel on the left (CSS in its `index.html`, `TOOLS_PADDING` in its `story.js`). The story card stays bottom-left. It has five steps: step 4 zooms to Franklin Power Ventures and selects Franklin Memorial Medical Center, a hospital outside the flood zone that loses power. Its last step leads to story 4, and story 4 links back to it.
-- `public/stories/fade.js` fades through black between story 1 and story 3 (`fadeTo(url)`); pages load it in `<head>` so the fade-in starts before the first paint.
-- Shared map code is `public/map/core.js` (`createMap` and its options), `panel.js` (layer panel, legends) and `core.css`. `cascade-graph.js` draws the cascade around a selected facility for story 5's facility detail (vertical, tier colours, natural size so its text never scales).
+Two pages (Nov 2026; the explorer and stories 1 and 3 were removed, their Figma frames remain). Old `/stories/story-N/` addresses redirect to them, keeping the `#N` step.
+
+- The USACE journey (story 5 in Figma) is the site root: `public/index.html` and `public/story.js`. It started as a copy of story 1 with the sidebar on the right and the layer panel on the left (CSS in `index.html`, `TOOLS_PADDING` in `story.js`). The story card stays bottom-left. It has five steps: step 4 zooms to Franklin Power Ventures and selects Franklin Memorial Medical Center, a hospital outside the flood zone that loses power. Its last step and the "Emergency Managers" toggle lead to the EM interface.
+- The EM interface (story 4 in Figma) is `/em/` (`public/em/index.html`): a 50/50 split screen, live map left, report right; each overview row opens its subpage in place (risk overview, flooding, EAP, evacuation notices; the subpage is internal state, the URL holds the story step `#1`–`#5`), and the map switches to that subpage's layers. The risk overview combines direct and indirect impacts (tier table, a clickable flood timeline with the cascade as a tree, life loss). The flooding facts come from `public/summary.js`, shared with the USACE sidebar. Its "USACE" toggle and step 1's back button lead back to `/#5`.
+- `public/fade.js` fades through black between the two pages (`fadeTo(url)`); pages load it in `<head>` so the fade-in starts before the first paint.
+- Shared map code is `public/map/core.js` (`createMap` and its options), `panel.js` (layer panel, legends) and `core.css`. `cascade-graph.js` draws the cascade around a selected facility for the USACE journey's facility detail (vertical, tier colours, natural size so its text never scales).
 
 Run the site with `./script server` (port 8080). It's deployed to GitHub Pages from `public/` (README, Deploy); keep every file under 100 MB. Locally, `public/data/terrain.pmtiles` may be the full zoom-15 copy (`build/terrain-z15.pmtiles`, 242 MB), hidden from git with `git update-index --skip-worktree`; the committed file is the 69 MB zoom-14 cut. Undo with `git update-index --no-skip-worktree public/data/terrain.pmtiles && git checkout public/data/terrain.pmtiles`. The data build is `uv run scripts/build_data.py`. To run one build step on its own, load the script with `uv run --with pyshp --with pyproj --with rasterio --with numpy --with pillow --with shapely --with scipy python` and call the function.
 
@@ -31,9 +31,9 @@ File `FTpE5i6BheiMWE7zVX7N6f`, page "Prototype". Story frames sit in rows around
 ## Verifying
 
 - Syntax-check every changed script. For inline modules, extract the `<script type="module">` body to a `.mjs` file in the scratchpad and run `node --check`.
-- After removing code, re-read the lines around the cut. A slice once deleted story 3's map loader (`mapObserver`, `watchMaps`) along with the code it was meant to remove.
+- After removing code, re-read the lines around the cut. A slice once deleted a page's map loader along with the code it was meant to remove.
 - Maps only load while the browser pane is visible. Check `tabs_context` first. If the pane is hidden, DOM checks still work but maps, `createMap` and `requestAnimationFrame` don't. Say what couldn't be checked; don't report it as passing.
-- 3D terrain maps (story 1, the explorer) currently don't finish loading in the pane at all, even when it's visible. The 2D maps in stories 2 and 3 do.
+- The USACE journey's 3D terrain map currently doesn't finish loading in the pane at all, even when it's visible, so its steps can't be clicked through there. The EM interface's 2D map does load.
 - The browser caches pages: add `?v=N` to the URL after edits.
 
 ## Data notes

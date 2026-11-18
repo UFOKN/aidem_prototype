@@ -1,8 +1,8 @@
-// Shared map for the explorer (../index.html) and the story experiments
-// (../stories/*). Builds the MapLibre map with all data layers and exposes a
+// Shared map for the USACE journey (../index.html) and the EM interface
+// (../em/). Builds the MapLibre map with all data layers and exposes a
 // small API to drive it. Pages add their own UI on top.
 //
-//   import { createMap } from "../../map/core.js";
+//   import { createMap } from "./map/core.js";
 //   const app = await createMap({ container: "map" });
 //   app.setFlood("arrival_first");   // "depth_max", "velocity_max", "arrival_first" or null
 //   app.setTime(9.5);                // flood advance clock, hours since start

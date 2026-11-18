@@ -1,4 +1,5 @@
-// Fade through black between story 1 (USACE) and story 3 (EM interface).
+// Fade through black between the USACE journey (index.html) and the EM
+// interface (em/).
 // fadeTo(url) fades the page out to black (500 ms), then opens url; the next
 // page, if it loads this script in its <head>, fades in from black. A plain
 // script (not a module) so the fade-in is set up before the first paint.

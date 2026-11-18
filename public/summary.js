@@ -1,11 +1,11 @@
-// The scenario summary's sections, shared by story 1's sidebar and story 4's
-// detail pages so both show the same figures. Each function returns the
+// The scenario summary's sections, shared by the USACE journey's sidebar
+// (index.html) and the EM interface's detail pages (em/) so both show the same figures. Each function returns the
 // section's tables (no heading); callers wrap them.
 //
 // zones: the evacuation zones' properties (LifeSim results; each life loss
 // figure is a mean for one scenario, so zones add up within a column).
 // impacts: cascade_summary.json; useByTier: cascade_use_by_tier.json.
-import { BREACH_HOURS, IMPACT_TIERS, clock } from "../map/core.js";
+import { BREACH_HOURS, IMPACT_TIERS, clock } from "./map/core.js";
 
 // Flood figures from the flood rasters (computed once from the source GeoTIFFs).
 export const FLOOD_FACTS = {

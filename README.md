@@ -38,10 +38,12 @@ Intermediate files (reprojected COGs, the full terrain, build stamps) go to `bui
 
 ## Pages
 
-- `public/index.html`: the explorer, i.e. the shared map plus the layer panel
+- `public/index.html` (+ `story.js`): the USACE journey, the site root
+- `public/em/`: the EM interface, at `/em/`
+- `public/summary.js`, `public/fade.js`: the scenario summary tables both pages show, and the fade through black between them
+- `public/stories/story-N/`: redirects from the old story addresses (1 and 5 to the root, 3 and 4 to `/em/`), keeping the `#N` step
 - `public/map/core.js`: the shared map. `createMap()` builds the map with all data layers and returns a small API (`setFlood`, `setTime`, `play`, `setLayer`, `selectZone`, `zoneStats`, `zoneBounds`, events, plus `app.map` for plain MapLibre). Data paths resolve relative to this file, so pages can live in any folder. `core.css` has the shared styles
-- `public/map/panel.js` (+ `panel.css`): the explorer's layer panel and legend helpers
-- `public/stories/<name>/`: one folder per storytelling direction, each a standalone page at `/stories/<name>/` built on `map/core.js`. Keep story-specific code in its folder; move something into `map/` only once a second story needs it. Delete a folder to drop a direction. `story-1` is the first story at wireframe stage (from Figma, AidEM, Section 1)
+- `public/map/panel.js` (+ `panel.css`): the layer panel and legend helpers
 
 ## Run
 

@@ -3,21 +3,256 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AidEM Map Prototype</title>
+  <title>AidEM Flood Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;1,8..60,400&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.15.0/dist/maplibre-gl.css">
+  <script src="fade.js"></script>
   <link rel="stylesheet" href="map/core.css">
   <link rel="stylesheet" href="map/panel.css">
+  <style>
+    /* The USACE journey (story 5 in Figma), at the site root: began as a copy of
+       story 1 (since removed) with the sidebar on the right and the layer panel
+       (map legend) on the left.
+       Story UI tokens. Same names as the "Story UI" variables in Figma
+       (AidEM file, frames "Story 1 / Step N"): card/width there is
+       --card-width here. Change a value in either place, then sync. */
+    :root {
+      --card-bg: #000000;
+      --card-text: #ffffff;
+      --card-muted-text: #bdbdbd;
+      --button-bg: #ffffff;
+      --button-text: #000000;
+      --button-secondary-bg: #808080;
+      --toolbar-bg: #27313d; /* slate (Figma: Colour options, Slate) */
+      --toolbar-text: #ffffff;
+      --toolbar-muted-text: rgba(255, 255, 255, 0.7);
+      --audience-bg: #ffffff;
+      --audience-off-bg: #cfd7e0;
+      --audience-text: #000000;
+      --accent: #4a5d70;
+      --accent-text: #ffffff;
+      /* layer panel flood toggle (panel.css) */
+      --segment-bg: var(--accent);
+      --segment-text: var(--accent-text);
+      --segment-off-bg: var(--audience-off-bg);
+      --segment-off-text: var(--audience-text);
+      --segment-off-opacity: 1;
+      --card-width: 360px;
+      --card-padding: 20px;
+      --card-gap: 20px;
+      --card-inset: 10px;
+      --card-paragraph-gap: 22px;
+      --card-font-family: "Source Serif 4", Georgia, serif;
+      --card-font-size: 20px;
+      --card-small-font-size: 18px;
+      --button-font-size: 13px;
+      --button-padding-x: 8px;
+      --button-padding-y: 8px;
+      --button-gap: 6px;
+      --toolbar-height: 50px;
+      --toolbar-padding-x: 16px;
+      --sidebar-width: 361px;
+      --sidebar-padding: 16px;
+    }
+
+    /* Wireframe: black story card bottom-left, as in Figma (AidEM, Section 1). */
+    .card {
+      position: absolute; left: var(--card-inset); bottom: var(--card-inset); z-index: 3; /* above map controls */
+      width: var(--card-width); box-sizing: border-box; padding: var(--card-padding);
+      display: flex; flex-direction: column; gap: var(--card-gap); align-items: flex-start;
+      background: var(--card-bg); color: var(--card-text);
+      font: var(--card-font-size)/1.22 var(--card-font-family);
+    }
+    .card .content { display: flex; flex-direction: column; gap: var(--card-paragraph-gap); }
+    .card img { width: 100%; aspect-ratio: 300 / 221; object-fit: cover; display: block; }
+    .card p { margin: 0; }
+    .card p.note { font-size: var(--card-small-font-size); color: var(--card-muted-text); }
+    /* Image credit, small, right under the image */
+    .card p.credit { margin-top: calc(-1 * var(--card-paragraph-gap) + 6px); font: 11px/1.3 Inter, system-ui, sans-serif; color: var(--card-muted-text); }
+    .card nav { display: flex; flex-wrap: wrap; gap: var(--button-gap); }
+    .card nav > * { white-space: nowrap; }
+    .card button {
+      padding: var(--button-padding-y) var(--button-padding-x); border: 0; border-radius: 0;
+      background: var(--button-bg); color: var(--button-text); font: var(--button-font-size)/1.2 Inter, system-ui, sans-serif; cursor: pointer;
+    }
+    /* Back: an arrow in a grey square, as tall as the other buttons */
+    .card button.prev { background: var(--button-secondary-bg); aspect-ratio: 1; padding-block: var(--button-padding-y); padding-inline: 0; min-width: calc(var(--button-font-size) * 1.2 + 2 * var(--button-padding-y)); }
+    .card button[hidden] { display: none; }
+    /* Subtle separation from the panels and map */
+    .card { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); }
+    /* When the card's text changes it fades in, so the change is noticed */
+    .card .enter { animation: card-enter 0.45s ease-out both; }
+    @keyframes card-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    /* The previous text slides out the top of the card (setCardText in story.js) */
+    .card { overflow: hidden; }
+    .card .content.leaving { position: absolute; margin: 0; pointer-events: none; animation: card-leave 0.4s ease-in both; }
+    @keyframes card-leave { to { opacity: 0; transform: translateY(-60px); } }
+    /* The next button pulses gently */
+    .card button.next { animation: next-pulse 2.4s ease-in-out infinite; }
+    @keyframes next-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @media (prefers-reduced-motion: reduce) { .card .enter, .card button.next, .cascade-pill { animation: none; } .card .content.leaving { animation-duration: 1ms; } }
+    /* "Show cascades" pill next to the power plant (steps 3 and 4) */
+    .cascade-pill {
+      padding: 6px 12px; border: 0; border-radius: 999px; background: #ffffff; color: #000000; cursor: pointer;
+      font: 13px/1.2 Inter, system-ui, sans-serif; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      animation: pill-bounce 1.6s ease-in-out infinite;
+    }
+    @keyframes pill-bounce { 0%, 100% { translate: 0 0; } 50% { translate: 4px 0; } }
+    /* Start over: a muted, label-only button (all cards but the first) */
+    .card button.start-over { background: none; color: var(--button-secondary-bg); padding-inline: 4px; }
+    .card button.start-over:hover { color: var(--card-text); }
+
+    /* Step heading with a minimize button; minimized, the card is a single
+       "Guided tour +" button (Figma: card 436:1607, minimized 436:1600). */
+    .card .head { display: flex; align-items: center; gap: 20px; width: 100%; }
+    .card .head .step { flex: 1; margin: 0; font: 13px/normal Inter, system-ui, sans-serif; color: #808080; text-transform: uppercase; }
+    .card button.minimize, .card button.restore { padding: 0; background: none; color: var(--card-text); font: var(--card-font-size)/1.22 var(--card-font-family); }
+    .card button.restore { display: none; gap: var(--card-paragraph-gap); text-align: left; }
+    .card.min { width: auto; }
+    .card.min > :not(.restore) { display: none; }
+    .card.min button.restore { display: flex; }
+    /* Calculate cascading impacts, in the sidebar's empty indirect impacts section */
+    .sidebar .calculate { width: 100%; padding: 10px; border: 0; border-radius: 0; background: var(--accent); color: var(--accent-text); font: 14px/1.2 Inter, system-ui, sans-serif; cursor: pointer; }
+
+    /* No top bar in story 5: the audience toggle sits at the top of the
+       sidebar. On white, the selected side is the dark toolbar colour. */
+    .sidebar .audience { flex: none; display: flex; justify-content: flex-end; gap: 1px; padding: 0 var(--sidebar-padding) var(--sidebar-padding); }
+    .sidebar .audience button {
+      padding: 8px 16px; border: 0; border-radius: 0; background: var(--audience-off-bg); color: var(--audience-text);
+      font: 15px/18px Inter, system-ui, sans-serif; white-space: nowrap; cursor: pointer;
+    }
+    .sidebar .audience button[aria-pressed="true"] { background: var(--toolbar-bg); color: var(--toolbar-text); cursor: default; }
+    body.instant * { transition: none !important; } /* step opened from the URL: tools just there */
+    /* Product name, floating top-left on the map in every step */
+    .brand {
+      position: absolute; top: 0; left: 0; z-index: 2; box-sizing: border-box;
+      height: var(--toolbar-height); padding: 0 var(--toolbar-padding-x);
+      display: flex; align-items: center;
+      color: #000000; font: 14px/1.2 Inter, system-ui, sans-serif; pointer-events: none;
+    }
+
+    /* Layer panel top right; zoom control moves from top right to the right
+       edge of the sidebar. */
+    .layer-panel { top: calc(var(--toolbar-height) + 22px); left: 16px; right: auto; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
+    body.tools .layer-panel { opacity: 1; pointer-events: auto; }
+    body.tools .maplibregl-ctrl-top-right { top: 10px; right: calc(var(--sidebar-width) + 14px); left: auto; }
+    /* Attribution left of the sidebar */
+    body.tools .maplibregl-ctrl-bottom-right { right: var(--sidebar-width); }
+
+    /* Sidebar: summary of the scenario, slides in from the right with the
+       toolbar. (In story 1 it's on the left, under the story card.) */
+    .sidebar {
+      position: absolute; top: 0; bottom: 0; right: 0; z-index: 2; box-sizing: border-box; display: flex; flex-direction: column;
+      width: var(--sidebar-width); padding: var(--sidebar-padding) 0;
+      background: #ffffff; color: #000000; font: 14px/1.25 Inter, system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); /* like the legend */
+      transform: translateX(100%); transition: transform 0.5s ease;
+    }
+    body.tools .sidebar { transform: none; }
+    /* Vertical scroll only: the full-width section dividers reach into the
+       padding on purpose and must not make the sidebar scroll sideways. */
+    .sidebar .scroll, .sidebar .detail { box-sizing: border-box; flex: 1; min-height: 0; padding: 0 var(--sidebar-padding); overflow-y: auto; overflow-x: hidden; }
+    .sidebar .scroll[hidden] { display: none; }
+    /* Facility details, over the summary */
+    .sidebar .detail .back { margin: 0 0 16px; padding: 0; border: 0; background: none; font: 14px/1.25 Inter, system-ui, sans-serif; color: #555555; cursor: pointer; }
+    .sidebar .detail h2 i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: 1px; }
+    .sidebar .detail .type { margin: -10px 0 12px; color: #555555; }
+    .sidebar h3 { margin: 20px 0 8px; font-size: 15px; font-weight: 600; }
+    .sidebar h2 + h3 { margin-top: 0; }
+    .sidebar h3 + .type { margin-top: -4px; }
+    .sidebar .detail td:last-child { padding-left: 12px; }
+    .sidebar .detail .cascade-graph { display: block; flex: none; margin: 4px 0 8px; overflow: visible; } /* natural size: text never scales */
+    .cascade-graph [data-facility] { cursor: pointer; }
+    .cascade-graph .cg-band.hover { fill: #f5f5f5; }
+    .sidebar .note { margin: 8px 0 0; font-size: 12px; color: #888888; }
+    /* Sections split by full-width dividers */
+    .sidebar section + section { margin: 16px calc(-1 * var(--sidebar-padding)) 0; padding: 16px var(--sidebar-padding) 0; border-top: 1px solid #cccccc; }
+    .sidebar h2 { margin: 0 0 16px; font-size: 20px; font-weight: 600; }
+    .sidebar table + table { margin-top: 8px; }
+    /* Tables with column heads: label column, then two right-aligned columns */
+    .sidebar table.cols th:not(:first-child), .sidebar table.cols td:not(:first-child) { width: 100px; }
+    .sidebar td i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+    .sidebar table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .sidebar td, .sidebar th { padding: 2px 0; text-align: right; font-weight: normal; vertical-align: top; }
+    .sidebar td:first-child, .sidebar th:first-child { text-align: left; color: #555555; }
+    .sidebar .sub td:first-child { padding-left: 10px; }
+    .sidebar thead th { font-size: 11px; color: #888888; }
+    .sidebar .na { color: #888888; }
+    /* Rows that open sub-rows (buildings by use) */
+    .sidebar .expand { width: 14px; margin: 0 4px 0 -2px; padding: 0; border: 0; background: none; color: #555555; font: inherit; line-height: 1; cursor: pointer; }
+    .sidebar .expand::before { content: "›"; display: inline-block; font-size: 16px; transition: transform 0.15s ease; }
+    .sidebar .expand[aria-expanded="true"]::before { transform: rotate(90deg); }
+    .sidebar .expand.after { margin: 0 0 0 4px; }
+    .sidebar .nowrap { white-space: nowrap; }
+    /* All impacts: row dividers as in story 4 */
+    .sidebar .all-impacts td { padding: 6px 0; border-top: 1px solid #e3e3e3; }
+    .sidebar .all-impacts tr.use td { padding: 4px 0; border-top-color: #f0f0f0; }
+    .sidebar .all-impacts tr.use td:first-child { padding-left: 18px; }
+    .sidebar .all-impacts tr.total td { font-weight: 600; color: #000000; }
+    /* Tier labels hang past their swatch, so a wrapped line starts under the text */
+    .sidebar .all-impacts td:has(> i) { padding-left: 18px; text-indent: -18px; }
+    .sidebar .all-impacts td:has(> i) :is(i, .expand) { text-indent: 0; }
+    /* Tier rows above their sub rows: black labels; sub rows smaller and grey */
+    .sidebar .all-impacts tr:not(.use) td:first-child { color: #000000; }
+    .sidebar .all-impacts tr.use td { font-size: 13px; color: #777777; }
+    /* Step 2: "+ Calculate cascading impacts" below each table, like an add-row button;
+       the rows it brings in fade in */
+    .sidebar .all-impacts .add-row { display: block; width: 100%; margin: 0; padding: 6px 0 6px 18px; border: 0; border-top: 1px solid #e3e3e3; background: none; color: #555555; font: 13px/1.2 Inter, system-ui, sans-serif; text-align: left; cursor: pointer; }
+    .sidebar .all-impacts .add-row:hover { color: #000000; background: #f5f5f5; }
+    .sidebar .all-impacts tr.appearing td { animation: row-in 0.4s ease both; }
+    @keyframes row-in { from { opacity: 0; } }
+    .sidebar .all-impacts .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #dddddd; border-top-color: #555555; border-radius: 50%; animation: calc-spin 0.8s linear infinite; vertical-align: -2px; }
+    @keyframes calc-spin { to { transform: rotate(360deg); } }
+    .sidebar .all-impacts tr[data-tier]:not(.use) { cursor: pointer; }
+    .sidebar .all-impacts tr[data-tier]:not(.use):hover td { background: #f5f5f5; }
+    .sidebar .all-impacts tr.use .facility-icon { width: 11px; height: 11px; margin-left: 6px; vertical-align: -1px; color: #888888; } /* after the label, as in story 4 */
+    .sidebar .all-impacts tr.total td:first-child { padding-left: 18px; } /* in line with the labels, past the swatch */
+    .sidebar tr.use td:first-child { padding-left: 38px; }
+    .sidebar tr.use td { color: #555555; }
+    .sidebar tr.use[hidden] { display: none; }
+    /* Its own group, set apart from the tables above */
+    .sidebar table.group { margin-top: 16px; }
+    /* All impacts (draft): one table across the tiers, and the cascade timeline */
+    .sidebar table.cols.tiers th:not(:first-child), .sidebar table.cols.tiers td:not(:first-child) { width: 72px; }
+    .sidebar .cascade { position: relative; margin: 0; padding: 0; list-style: none; }
+    .sidebar .cascade li { position: relative; display: block; padding: 4px 0; cursor: pointer; }
+    .sidebar .cascade li:hover { background: #f5f5f5; }
+    .sidebar .cascade time { display: block; font-size: 12px; line-height: 16px; color: #777777; font-variant-numeric: tabular-nums; }
+    .sidebar .cascade li > span { display: flex; align-items: flex-start; gap: 6px; line-height: 18px; }
+    .sidebar .cascade .dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; }
+    .sidebar .cascade small { display: block; font-size: 12px; color: #777777; }
+    .sidebar .cascade li.dam { cursor: default; }
+    .sidebar .cascade li.dam:hover { background: none; }
+    .sidebar .cascade li.dam .dot { visibility: hidden; margin-top: 21px; }
+    .sidebar .cascade b { position: absolute; border-left: 1px solid #b5b5b5; }
+    .sidebar .cascade svg { position: absolute; top: 0; overflow: visible; fill: none; stroke: #b5b5b5; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Scale bar right of the story card; it comes in with the toolbar */
+    .maplibregl-ctrl-bottom-left .scale-bar { margin-left: calc(var(--card-width) + var(--card-inset) + 16px); opacity: 0; transition: opacity 0.6s; }
+    body.tools .maplibregl-ctrl-bottom-left .scale-bar { opacity: 1; }
+  </style>
 </head>
 <body>
-  <!-- Explorer: the shared map (map/core.js) plus the layer panel. -->
   <div id="map"></div>
-  <script type="module">
-    import { createMap } from "./map/core.js";
-    import { createPanel } from "./map/panel.js";
-
-    const app = await createMap({ container: "map", hash: true, terrain: true });
-    createPanel(app);
-    window.app = app;
-  </script>
+  <div class="brand">AidEM Flood Tool</div>
+  <aside class="sidebar">
+    <div class="audience" role="group" aria-label="Audience">
+      <button aria-pressed="true">USACE</button>
+      <button aria-pressed="false">Emergency Managers</button><!-- goes to the EM interface (em/) -->
+    </div>
+  </aside>
+  <div class="card">
+    <div class="head"><p class="step"></p><button class="minimize" aria-label="Minimize" title="Minimize">–</button></div>
+    <div class="content"></div>
+    <nav>
+      <button class="prev" aria-label="Back" title="Back">←</button>
+      <button class="next"></button>
+      <button class="start-over">Start over</button>
+    </nav>
+    <button class="restore" aria-label="Show the guided tour"><span>Guided tour</span><span aria-hidden="true">+</span></button>
+  </div>
+  <script type="module" src="story.js"></script>
 </body>
 </html>

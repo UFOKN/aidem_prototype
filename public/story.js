@@ -1,18 +1,23 @@
-// Story 1, wireframe stage. Text and frames from Figma (AidEM, Section 1,
-// node 12:408). The current step is kept in the URL hash (#2).
+// The USACE journey (story 5 in Figma), at the site root. It began as a copy
+// of story 1 (Figma: AidEM, Section 1, node 12:408). The current step is kept
+// in the URL hash (#2); the last step leads to the EM interface (em/).
 
-import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, clock, facilityName } from "../../map/core.js";
-import { createPanel } from "../../map/panel.js";
-import { directTables, indirectTables, floodTables, toggleUses } from "../summary.js";
+import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, clock, facilityName, FACILITY_ICONS, facilityIconSvg } from "./map/core.js";
+import { createPanel } from "./map/panel.js";
+import { cascadeGraphSvg } from "./map/cascade-graph.js";
+import { floodTables, toggleUses } from "./summary.js";
 
 // Opening view on the South Fork Dam (from the explorer's URL
 // #16.72/40.348515/-78.774338/176.3/60: zoom/lat/lng/bearing/pitch).
 const DAM_VIEW = { center: [-78.774338, 40.348515], zoom: 16.72, bearing: 176.3, pitch: 60, elevation: 474.5 };
 
-// Cascading impacts summary (../data/johnstown_cascade, copied by the pipeline).
-const impacts = await fetch("../../data/cascade_summary.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+// Cascading impacts summary (data/johnstown_cascade, copied by the pipeline).
+const impacts = await fetch("data/cascade_summary.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
 // The same buildings by use (homes, businesses, ...) in each tier, for the expandable buildings table.
-const useByTier = await fetch("../../data/cascade_use_by_tier.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const useByTier = await fetch("data/cascade_use_by_tier.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+// Facilities, their links and service areas, for the combined impacts section (as story 4's risk overview)
+const getJson = (f) => fetch(`data/${f}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const [cascadeFacilities, cascadeLinks, serviceAreas] = await Promise.all(["cascade_facilities.geojson", "cascade_links.geojson", "cascade_service_areas.geojson"].map(getJson));
 
 const app = await createMap({
   container: "map",
@@ -56,8 +61,8 @@ const FLOOD_SPEED = 0.06;     // simulated hours per second while the flood play
 // Camera calls with their own padding stack on top of the map's padding.
 const NO_PADDING = { top: 0, right: 0, bottom: 0, left: 0 };
 const CARD_PADDING = { top: 20, right: 20, bottom: 20, left: 320 };
-// With the toolbar, sidebar (361px) and layer panel (230px, right) showing.
-const TOOLS_PADDING = { top: 70, right: 270, bottom: 30, left: 390 };
+// With the toolbar, sidebar (361px, right) and layer panel (230px, left) showing.
+const TOOLS_PADDING = { top: 70, right: 390, bottom: 30, left: 390 }; // sidebar right; layer panel and card left (story 5)
 
 // Impact layers (LAYER_GROUPS in map/core.js): direct (flooded facilities
 // and buildings) from step 2 on, indirect (loss of service) from step 3 on.
@@ -79,6 +84,7 @@ function overviewBounds() {
 // The facility step 3 is about: Franklin Power Ventures (hypothetical),
 // flooded, whose failure takes power from the hospitals and schools it serves.
 const CASCADE_FACILITY = "Franklin Power Ventures";
+const HOSPITAL = "FRANKLIN MEMORIAL MEDICAL CENTER"; // loses power from it (step 4)
 const OVERVIEW = (fly) => ({ bounds: overviewBounds(), bearing: JOHNSTOWN.bearing, pitch: fly ? app.map.getPitch() : JOHNSTOWN.pitch, padding: TOOLS_PADDING });
 
 // Each step is a static state, so the URL (#2) always opens the same view.
@@ -90,6 +96,7 @@ const OVERVIEW = (fly) => ({ bounds: overviewBounds(), bearing: JOHNSTOWN.bearin
 const steps = [
   {
     // Frame 1: map centered on dam
+    title: "Introduction",
     html: `
       <img src="dam-1889.png" alt="">
       <p class="credit">Image: NPS/Harpers Ferry Center</p>
@@ -109,6 +116,7 @@ const steps = [
   },
   {
     // Frame 2: Johnstown after the flood front got there, with the tools
+    title: "Flood modeling",
     html: `<p>AidEM uses some of the best hydrologic modeling and impact assessment to assess direct flood impacts.</p>`,
     // Added to the card at the end of the flood animation (the result of step 2).
     result: `<p>We combine it with local data to deliver location-specific risk insights.</p>`,
@@ -129,9 +137,9 @@ const steps = [
   },
   {
     // Frame 3: cascading impacts of one flooded facility, two levels deep
+    title: "Cascading impacts",
     html: `
-      <p>Flooding causes disruption far beyond the flood zone. AidEM models cascading failures.</p>
-      <p>Explore the map. When you’re ready, click Next to turn data into action.</p>`,
+      <p>Flooding causes disruption far beyond the flood zone. AidEM models those cascading impacts.</p>`,
     next: "Next →",
     show({ fly, slide, keepFacility = false }) {
       app.setInteractive(true);
@@ -144,13 +152,35 @@ const steps = [
     },
   },
   {
-    // Frame 4: same map as step 3
+    // Frame 4: a hospital outside the flood zone that loses power when
+    // Franklin Power Ventures floods: both in view, the hospital selected
+    // (its arrow from the plant and the buildings it serves).
+    title: "Cascading impacts",
+    html: `
+      <p>This hospital is outside the flood zone but would lose power when its energy source floods.</p>`,
+    next: "Next →",
+    show({ fly, slide }) {
+      app.setInteractive(true);
+      cascadeLayers({ keepFlood: fly });
+      showTools(slide);
+      app.setCascades(true);
+      hidePill();
+      const [a, b] = [CASCADE_FACILITY, HOSPITAL].map((n) => app.facilityInfo(n).lngLat);
+      const bounds = [[Math.min(a[0], b[0]), Math.min(a[1], b[1])], [Math.max(a[0], b[0]), Math.max(a[1], b[1])]];
+      moveCamera({ bounds, bearing: JOHNSTOWN.bearing, pitch: JOHNSTOWN.pitch, padding: TOOLS_PADDING, maxZoom: 15 }, fly);
+      app.selectFacility(HOSPITAL);
+    },
+  },
+  {
+    // Frame 5: same map as step 3
+    title: "Collaboration",
     html: `
       <p>Successful evacuations require collaboration between USACE and emergency managers on the ground</p>
-      <p>Next, bring in EMs to coordinate evacuations before flooding strikes.</p>`,
-    next: "Go to EM interface →", // on to the EM interface (story 3)
+      <p>Share report with the County Emergency Manager.</p>`,
+    next: "Share report →", // on to the EM interface (story 4)
     show(opts) {
       steps[2].show(opts);
+      hidePill(); // the pill is step 3's
     },
   },
 ];
@@ -203,28 +233,22 @@ function cascadeLayers({ keepFlood = false } = {}) {
   showImpacts({ direct: true, indirect: true });
 }
 
-// "Show cascades": a bouncing pill next to the power plant in steps 3 and 4.
-// Clicking it selects the plant: its arrows grow out to the facilities it
-// takes out, then the buildings that lose a service fade in. It only shows
-// until the reader has seen one cascade (by the pill or by clicking a facility).
-let pill = null, pillUsed = false;
+// "Show cascades": a bouncing pill next to Franklin Memorial Medical Center,
+// always in step 3 while nothing is selected. Clicking it goes on to step 4,
+// which zooms in and selects the hospital.
+let pill = null;
 function showPill() {
   if (!pill) {
     const el = document.createElement("button");
     el.className = "cascade-pill";
     el.textContent = "Show cascades";
-    el.addEventListener("click", (e) => { e.stopPropagation(); showCascade(); });
-    pill = new app.maplibregl.Marker({ element: el, anchor: "left", offset: [16, 0] }).setLngLat(app.facilityInfo(CASCADE_FACILITY).lngLat);
+    el.addEventListener("click", (e) => { e.stopPropagation(); go(3); }); // step 4 selects the hospital
+    pill = new app.maplibregl.Marker({ element: el, anchor: "left", offset: [16, 0] }).setLngLat(app.facilityInfo(HOSPITAL).lngLat);
   }
-  if (!app.facility && !pillUsed) pill.addTo(app.map);
+  if (!app.facility && current === 2) pill.addTo(app.map);
 }
 function hidePill() { pill?.remove(); }
-app.on("facility", (name) => { if (name) { pillUsed = true; hidePill(); } else if (current >= 2) showPill(); });
-async function showCascade() {
-  app.selectFacility(CASCADE_FACILITY, { buildings: false });
-  await growLinks();
-  if (app.facility === CASCADE_FACILITY) app.showAffectedBuildings({ fade: 1000 });
-}
+app.on("facility", (name) => { if (name) hidePill(); else showPill(); });
 // The selected facility's arrows grow out from it.
 async function growLinks() {
   const GROW_MS = 1500, t0 = performance.now();
@@ -326,8 +350,10 @@ function flyTo(camera, duration = 2500) {
 let panel = null;
 // Without slide they appear in place (body.instant turns the transitions off).
 function showTools(slide = true) {
-  panel ??= createPanel(app);
-  if (!sidebar.hasChildNodes()) sidebar.innerHTML = sidebarHtml();
+  // No evacuation zones toggle in story 5, and one toggle for both impact groups
+  // (indirect ones only once the cascade is calculated, step 3 on)
+  panel ??= createPanel(app, { evac: false, oneImpactToggle: true, impactGroups: () => (current >= 2 ? ["directImpacts", "indirectImpacts"] : ["directImpacts"]) });
+  if (!sidebar.querySelector(".scroll")) sidebar.insertAdjacentHTML("beforeend", sidebarHtml()); // below the audience toggle
   syncIndirect();
   if (slide) {
     requestAnimationFrame(() => document.body.classList.add("tools"));
@@ -342,7 +368,7 @@ function hideTools() {
 }
 
 // --- Sidebar ---------------------------------------------------------------
-// Scenario summary. The sections' tables come from ../summary.js, shared with
+// Scenario summary. The sections' tables come from summary.js, shared with
 // story 4: LifeSim results summed over the evacuation zones, the cascade
 // summary, and flood figures from the flood rasters.
 
@@ -385,64 +411,189 @@ function facilityHtml(p) {
         <tr><td>Offline</td><td>${when ?? "no time"}</td></tr>
       </table>
     </section>
-    ${inLinks.length ? `<section>
-      <h2>Depends on</h2>
-      <table>${inLinks.map((l) => `<tr><td>${facilityName(l.from)}</td><td>${l.service}</td></tr>`).join("")}</table>
-    </section>` : ""}
     ${current < 2 ? `<section>
       <h2>Impacts</h2>
       <button class="calculate">Calculate cascading impacts</button>
-    </section>` : p.area || outLinks.length ? `<section>
+    </section>` : ""}
+    ${current >= 2 && (inLinks.length || outLinks.length || p.area) ? `<section>
       <h2>Impacts</h2>
-      ${p.area ? `<h3>Buildings &amp; people</h3>
-      <table>
-        <tr><td>Buildings that lose its ${p.area.service}</td><td>${n(p.area.buildings)}</td></tr>
-        <tr><td>People</td><td>${n(p.area.pop_day)}</td></tr>
-      </table>` : ""}
-      ${outLinks.length ? `<h3>Facilities</h3>
-      <p class="type">${outLinks.length} ${outLinks.length === 1 ? "facility loses" : "facilities lose"} ${outLinks[0].service}</p>
-      <table>${outLinks.map((l) => `<tr><td>${facilityName(l.to)}</td></tr>`).join("")}</table>` : ""}
+      ${cascadeGraphSvg(p, (name) => app.facilityInfo(name))}
     </section>` : ""}
   </div>`;
 }
 
+// The summary: flood modeling, then (from step 3, see syncIndirect) Lives at
+// risk and All impacts. (The Direct and Indirect impacts sections were removed.)
 function sidebarHtml() {
-  const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
   return `<div class="scroll">
     <section>
     <h2>Flood modeling</h2>
     ${floodTables()}
     </section>
-    <section>
-    <h2>Direct impacts</h2>
-    ${directTables(zones, impacts)}
-    </section>
-    <section class="indirect"></section></div>`;
+    <section class="indirect" hidden></section></div>`;
 }
 
 // Cascading impacts from the analysis's summary (round 2). Buildings and
 // people are counted once, in the first tier where they lose something, so
 // the tiers add up; facilities likewise. Primary buildings are any that get
 // wet (NSI), so the count differs from LifeSim's structures above.
-// Indirect impacts section of the summary. Until the cascade has been
-// calculated (step 3) it only holds the button that calculates it.
+// All impacts from the flood modeling step (2) on, Lives at risk above it
+// from the cascade step (3); before that, nothing (an empty, hidden placeholder).
 function syncIndirect() {
   const el = sidebar.querySelector("section.indirect");
   if (!el) return;
-  el.outerHTML = current >= 2
-    ? impactsHtml()
-    : `<section class="indirect"><h2>Indirect impacts</h2><button class="calculate">Calculate cascading impacts</button></section>`;
-  sidebar.querySelector("section.indirect .calculate")?.addEventListener("click", () => go(2));
+  sidebar.querySelector("section.all-impacts")?.remove(); // replaced along with the section, not stacked
+  el.outerHTML = current >= 1 ? impactsHtml(current >= 2) : `<section class="indirect" hidden></section>`;
   if (app.facility) renderDetail();
 }
 
-function impactsHtml() {
+function impactsHtml(lives = true) {
+  if (!lives) return `<section class="indirect" hidden></section>${allImpactsHtml(true)}`;
   const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
+  // Lives at risk, with the same content as story 4's risk overview (LifeSim)
+  const sum = (k) => Math.round(zones.reduce((a, z) => a + z[k], 0)).toLocaleString("en-US");
   return `<section class="indirect">
-    <h2>Indirect impacts</h2>
-    ${indirectTables(zones, impacts, useByTier)}
-    </section>`;
+    <h2>Lives at risk</h2>
+    <table>
+      <tr><td>Direct, with 0–2 h warning</td><td>${sum("LL_D_Min")}</td></tr>
+      <tr><td>Direct, with 2–6 h warning</td><td>${sum("LL_D_Amp")}</td></tr>
+      <tr><td>Indirect</td><td>${sum("Ind_LL")}</td></tr>
+    </table>
+    <table class="group">
+      <tr><td>Structures likely to collapse</td><td>${sum("All_Collps")}</td></tr>
+    </table>
+    </section>${allImpactsHtml()}`;
 }
+
+// All impacts (draft, from story 4's risk overview, made compact for the
+// sidebar's width and an expert reader): one table across the three tiers with
+// people, buildings and facilities, each tier opening into building uses and
+// facility kinds; then the cascade as a timeline of facilities, each failure
+// under the one that causes it, with the people it leaves without a service on
+// a second line. A timeline row selects its facility (details and graph).
+const KINDS = [["energy", "Power"], ["hospital", "Hospitals"], ["school", "Schools"]];
+const SHOW_TIMELINE = false; // the cascade timeline is hidden for now (user, Nov 2026)
+// pending (step 2, before the cascade is calculated): the indirect tiers are
+// faded, without numbers, and the totals count the flooded tier only.
+function allImpactsHtml(pending = false) {
+  if (!impacts || !cascadeFacilities) return "";
+  const n = (v) => Math.round(v).toLocaleString("en-US");
+  const facs = cascadeFacilities.features.map((f) => f.properties);
+  const links = (cascadeLinks?.features ?? []).map((f) => f.properties);
+  const areaOf = (name) => serviceAreas?.features.find((f) => f.properties.name === name)?.properties;
+  const kindOf = (type) => Object.keys(FACILITY_ICONS).find((k) => FACILITY_ICONS[k].types.includes(type));
+  const facCount = (tier, kind) => facs.filter((p) => (tier == null || p.tier === tier) && (!kind || kindOf(p.type) === kind)).length;
+  const swatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}${IMPACT_TIERS[i].stroke ? `; box-shadow: inset 0 0 0 1px ${IMPACT_TIERS[i].stroke}` : ""}"></i>`;
+  const num = (v) => (v ? n(v) : `<span class="na">–</span>`);
+  const tiers = [["primary", 1], ["secondary", 2], ["tertiary", 3]].map(([key, i]) => ({ key, i, ...impacts.buildings[key].first_affected }));
+  // Three tables, each under its own heading: people per tier, structures
+  // (opening into buildings by use) and facilities (opening into their kinds)
+  // The toggle after the label (kept on the label's last word), so swatches line up with the people table
+  const tierCell = (t) => {
+    const words = IMPACT_TIERS[t.i].label.split(" "), last = words.pop();
+    return `<td>${swatch(t.i)}${words.length ? words.join(" ") + " " : ""}<span class="nowrap">${last}<button class="expand after" aria-expanded="false" aria-label="Show by kind"></button></span></td>`;
+  };
+  const waits = (t) => pending && t.i > 1;
+  // Step 2 shows only the flooded row; the other rows wait hidden with their
+  // number (data-value) until "Calculate cascading impacts" below the table
+  const pendingRow = (t, value) => `<tr class="pending" hidden><td>${swatch(t.i)}${IMPACT_TIERS[t.i].label}</td><td data-value="${value}"></td></tr>`;
+  const peopleRows = tiers.map((t) => (waits(t) ? pendingRow(t, n(t.pop_day)) : `<tr><td>${swatch(t.i)}${t.i === 1 ? "In the flood zone" : IMPACT_TIERS[t.i].label}</td><td>${n(t.pop_day)}</td></tr>`)); // people: the flooded tier reads "In the flood zone"
+  const structureRows = tiers.map((t) => waits(t) ? pendingRow(t, n(t.count)) : `<tr data-tier="str-${t.key}">${tierCell(t)}<td>${n(t.count)}</td></tr>`
+    + (useByTier?.[t.key] ?? []).map((u) => `<tr class="use" data-tier="str-${t.key}" hidden><td>${u.use}</td><td>${n(u.buildings)}</td></tr>`).join(""));
+  const facilityRows = tiers.map((t) => waits(t) ? pendingRow(t, facCount(t.i) ? n(facCount(t.i)) : "–") : `<tr data-tier="fac-${t.key}">${tierCell(t)}<td>${num(facCount(t.i))}</td></tr>`
+    + KINDS.map(([k, label]) => `<tr class="use" data-tier="fac-${t.key}" hidden><td>${label}${facilityIconSvg(k)}</td><td>${num(facCount(t.i, k))}</td></tr>`).join(""));
+  // Rows of one table; while pending, the total waits hidden too
+  const body = (rows, total) => `<tbody>${rows.join("")}${pending ? total.replace('<tr class="total">', '<tr class="total pending" hidden>') : total}</tbody>`;
+  const addRow = pending ? `<button class="add-row">+ Calculate cascading impacts</button>` : "";
+  const sum = (k) => tiers.filter((t) => !waits(t)).reduce((a, t) => a + t[k], 0);
+  // The cascade: facilities with an impact time, each under the facility it depends on
+  const event = (p) => ({ name: p.name, tier: p.tier, h: p.impact_h, text: p.tier === 1 ? `${facilityName(p.name)} floods` : `${facilityName(p.name)} loses ${p.services}` });
+  const hasCause = (p) => links.some((l) => l.to === p.name && facs.some((q) => q.name === l.from));
+  const events = [];
+  const add = (e, depth, lasts) => {
+    const kids = facs.filter((p) => p.impact_h != null && links.some((l) => l.from === e.name && l.to === p.name)).map(event).sort((a, b) => a.h - b.h);
+    events.push({ ...e, depth, lasts, hasKids: kids.length > 0 });
+    kids.forEach((k, i) => add(k, depth + 1, [...lasts, i === kids.length - 1]));
+  };
+  // The dam breach (hour 0 relative to the breach) among them, as a plain row
+  [...facs.filter((p) => p.impact_h != null && !hasCause(p)).map(event), { dam: true, h: 0, text: "South Fork Dam fails" }]
+    .sort((a, b) => a.h - b.h).forEach((e) => (e.dam ? events.push({ ...e, depth: 0, lasts: [] }) : add(e, 0, [])));
+  // Elbow lines: x of the dot at each depth (4 px to its centre), and its y,
+  // lower when the row starts with its time
+  const X = (k) => 4 + k * 16;
+  const timeOf = (e, i) => (e.depth && impactClock(events[i - 1].h) === impactClock(e.h) ? "" : impactClock(e.h));
+  const guides = (e, i) => {
+    const g = [], d = e.depth, DOT = timeOf(e, i) ? 29 : 13;
+    for (let k = 0; k < d - 1; k++) if (!e.lasts[k]) g.push(`<b style="left:${X(k)}px; top:0; bottom:0"></b>`);
+    if (d) {
+      g.push(`<svg style="left:${X(d - 1)}px" width="12" height="${DOT}"><path d="M0.5 0V${DOT - 4}Q0.5 ${DOT} 4.5 ${DOT}H8.5M6 ${DOT - 2.5}L8.5 ${DOT}L6 ${DOT + 2.5}"/></svg>`);
+      if (!e.lasts[d - 1]) g.push(`<b style="left:${X(d - 1)}px; top:${DOT}px; bottom:0"></b>`);
+    }
+    if (e.hasKids) g.push(`<b style="left:${X(d)}px; top:${DOT + 5}px; bottom:0"></b>`);
+    return g.join("");
+  };
+  const li = (e, i) => {
+    if (e.dam) return `<li class="dam"><span><span class="dot"></span><span><time>${impactClock(e.h)}</time>${e.text}</span></span></li>`;
+    const a = areaOf(e.name), time = timeOf(e, i);
+    return `<li data-facility="${e.name}">${guides(e, i)}<span style="padding-left:${e.depth * 16}px"><span class="dot" style="background:${IMPACT_TIERS[e.tier].color}${time ? "; margin-top: 21px" : ""}"></span><span>${time ? `<time>${time}</time>` : ""}${e.text}${a ? `<small>${n(a.pop_day)} people lose ${a.service}</small>` : ""}</span></span></li>`;
+  };
+  return `<section class="all-impacts">
+    <h2>All impacts</h2>
+    <h3>People</h3>
+    <table class="cols">
+      ${body(peopleRows, `<tr class="total"><td>Total</td><td data-value="${n(tiers.reduce((a, t) => a + t.pop_day, 0))}">${n(sum("pop_day"))}</td></tr>`)}
+    </table>
+    ${addRow}
+    <h3>Critical facilities</h3>
+    <table class="cols expandable">
+      ${body(facilityRows, `<tr class="total"><td>Total</td><td data-value="${facCount(null)}">${pending ? facCount(1) : facCount(null)}</td></tr>`)}
+    </table>
+    ${addRow}
+    <h3>Other structures</h3>
+    <table class="cols expandable">
+      ${body(structureRows, `<tr class="total"><td>Total</td><td data-value="${n(tiers.reduce((a, t) => a + t.count, 0))}">${n(sum("count"))}</td></tr>`)}
+    </table>
+    ${addRow}
+    <p class="note">Each building is counted once</p>
+    ${SHOW_TIMELINE ? `<h3>Cascade timeline</h3>
+    <ol class="cascade">${events.map(li).join("")}</ol>` : ""}
+  </section>`;
+}
+// A timeline row, or an entry in a facility's Impacts graph, selects its
+// facility: its details and graph replace the sidebar
+sidebar.addEventListener("click", (e) => {
+  const el = e.target.closest(".all-impacts li[data-facility], .cascade-graph [data-facility]");
+  if (!el || el.dataset.facility === app.facility) return;
+  app.selectFacility(el.dataset.facility);
+  // The map pans to it (zooming in if it is far out)
+  const info = app.facilityInfo(el.dataset.facility);
+  if (info) app.map.easeTo({ center: info.lngLat, zoom: Math.max(app.map.getZoom(), 13), duration: 800 });
+});
+// "Calculate cascading impacts" (step 2): the waiting rows and totals fade in
+// with a spinner where each number goes, then the numbers appear, and the
+// story moves on to the cascade step (whose tables are the same, now complete).
+sidebar.addEventListener("click", async (e) => {
+  if (!e.target.closest(".all-impacts .add-row")) return;
+  const section = sidebar.querySelector(".all-impacts");
+  section.querySelectorAll(".add-row").forEach((b) => b.remove());
+  const rows = [...section.querySelectorAll("tr.pending")];
+  const cells = rows.map((r) => r.querySelector("td[data-value]"));
+  cells.forEach((c) => (c.innerHTML = `<span class="spinner"></span>`));
+  rows.forEach((r) => { r.hidden = false; r.classList.add("appearing"); });
+  await new Promise((r) => setTimeout(r, 1200));
+  cells.forEach((c) => (c.textContent = c.dataset.value));
+  await new Promise((r) => setTimeout(r, 700));
+  if (current === 1) go(2);
+});
+// All impacts: a tier row opens anywhere on the row (the toggle handles itself)
+sidebar.addEventListener("click", (e) => {
+  const tr = e.target.closest(".all-impacts tr[data-tier]:not(.use)"); // sub rows don't toggle
+  if (tr && !e.target.closest(".expand")) tr.querySelector(".expand")?.click();
+});
+// In the graph, a facility and its people hover as one
+const hoverGraph = (name) => { for (const b of sidebar.querySelectorAll(".cascade-graph .cg-band")) b.classList.toggle("hover", b.dataset.facility === name); };
+sidebar.addEventListener("mouseover", (e) => hoverGraph(e.target.closest(".cascade-graph [data-facility]")?.dataset.facility));
+sidebar.addEventListener("mouseleave", () => hoverGraph(null));
 
 // --- Navigation ----------------------------------------------------------------
 
@@ -450,6 +601,9 @@ const content = document.querySelector(".card .content");
 const prev = document.querySelector(".card .prev");
 const next = document.querySelector(".card .next");
 const startOver = document.querySelector(".card .start-over");
+// Minimize: the card shrinks to a "Guided tour +" button that opens it again
+document.querySelector(".card .minimize").addEventListener("click", () => card.classList.add("min"));
+document.querySelector(".card .restore").addEventListener("click", () => card.classList.remove("min"));
 let current = -1;
 
 // New card text, written like an agent would: the old text slides out
@@ -491,6 +645,7 @@ function go(i) {
   app.pause();
   const step = steps[i];
   setCardText(step.html);
+  document.querySelector(".card .step").textContent = step.title;
   next.textContent = step.next;
   prev.hidden = i === 0;
   startOver.hidden = i === 0;
@@ -503,7 +658,7 @@ function go(i) {
 
 prev.addEventListener("click", () => go(current - 1));
 startOver.addEventListener("click", () => go(0));
-const EM_INTERFACE = "../story-3/";
+const EM_INTERFACE = "em/";
 next.addEventListener("click", () => {
   if (skip) skip();
   else if (current === steps.length - 1) fadeTo(EM_INTERFACE); // fade.js

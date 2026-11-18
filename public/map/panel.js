@@ -1,4 +1,4 @@
-// Layer panel used by the explorer (../index.html). Builds its own DOM and
+// Layer panel for the USACE journey and the EM overview. Builds its own DOM and
 // stays in sync with the app, so it also works next to code that drives the
 // map. Needs panel.css.
 //
