@@ -8,11 +8,16 @@
 //   app.setTime(9.5);                // flood advance clock, hours since start
 //   app.play({ to: 12, speed: 1 });  // animate the clock
 //   app.setLayer("evac", true);      // see LAYER_GROUPS
-//   app.selectZone(2);               // outline a zone (null clears)
+//   app.selectZone(2);               // focus a zone (null clears)
+//   app.selectFacility(name);        // a facility and its cascade (null clears)
 //   app.map.flyTo({ ... });          // plain MapLibre for everything else
-//   app.on("time", (t) => ...);      // events: time, play, flood, zone, layer
+//   app.on("time", (t) => ...);      // events: time, play, flood, zone, layer, facility
 //
-// Data paths resolve relative to this file, so pages can live in any folder.
+// The app object is the single owner of map state (flood layer, clock, layer
+// groups, selected zone and facility). Pages change it only through the API
+// and follow it through the events, so a panel and the page's own code never
+// disagree. Data paths resolve relative to this file, so pages can live in any
+// folder; loadData() fetches from the same data folder.
 
 import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@6.15.0/dist/maplibre-gl.mjs";
 import * as pmtiles from "https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm";
@@ -25,6 +30,11 @@ const ASSETS = new URL("../assets/", import.meta.url).href;
 const FLAVOR = "white";
 
 maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
+
+/** JSON from public/data/ (e.g. "cascade_summary.json"), or `fallback` if it's missing or broken. */
+export function loadData(file, fallback = null) {
+  return fetch(DATA + file).then((r) => (r.ok ? r.json() : fallback)).catch(() => fallback);
+}
 
 // ---------------------------------------------------------------------------
 // Styling constants (exported so pages can build legends from them)
@@ -116,7 +126,9 @@ export const LAYER_GROUPS = {
 };
 // Each facility layer has an icon layer on top (see FACILITY_ICONS).
 for (const g of ["directImpacts", "indirectImpacts"]) LAYER_GROUPS[g].push(...LAYER_GROUPS[g].filter((id) => id.startsWith("cascade-facilities-")).map((id) => `${id}-icon`));
-const OFF_BY_DEFAULT = ["directImpacts", "indirectImpacts"];
+// Every facility, whatever its tier, without the impact buildings (EM notices page)
+LAYER_GROUPS.facilities = ["directImpacts", "indirectImpacts"].flatMap((g) => LAYER_GROUPS[g].filter((id) => id.startsWith("cascade-facilities-")));
+const OFF_BY_DEFAULT = ["directImpacts", "indirectImpacts", "facilities"];
 
 // Facility icons (Figma: AidEM, 422:1274 energy, 422:1277 school, 422:1281
 // hospital): a white glyph (422:1308-1310, drawn from these SVG paths) over the
@@ -153,11 +165,6 @@ const FACILITY_LAYERS = ["cascade-facilities-direct", "cascade-facilities-indire
 // water for buildings), 2 secondary (lost a service from a failed facility),
 // 3 tertiary (lost a service from a facility that failed in tier 2).
 // Buildings are shown in their first tier only.
-/** Change tier colours or labels for one page (to try a scheme on one story).
- * Call before createMap: the map's layers read the tiers when built. */
-export function setImpactTiers(tiers) {
-  for (const [t, v] of Object.entries(tiers)) Object.assign(IMPACT_TIERS[t], v);
-}
 export const IMPACT_TIERS = {
   // Darkest at the flood (plum, so it stays apart from the pink tier 2 for
   // colour-blind readers too); tier 3's light amber has a dark outline that
@@ -167,13 +174,8 @@ export const IMPACT_TIERS = {
   2: { label: "Loss of service", note: "Depends on a flooded facility", color: "#d6336c" },
   3: { label: "Cascading loss of service", note: "Depends on facility that lost service", color: "#f39c12", stroke: "#9a5b00" },
 };
-// Colours of the failed utilities, by what they provide (legend only; the
-// cascade arrows are black).
-// Service areas themselves are never drawn; their data still gives the
-// buildings and people per facility and the story's overview bounds.
-export const UTILITY_AREAS = {
-  "Electric Power Generation": { label: "Power (hypothetical plant)", color: "#6a1b9a" },
-};
+// Service areas are never drawn; their data gives the buildings and people
+// per facility and the overview bounds.
 const tierColor = (prop) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, v.color]), "#999"];
 // Darker shades of the tier colours (k: the share of each channel kept), for hovered and pressed facilities
 const tierColorDarker = (prop, k) => ["match", ["get", prop], ...Object.entries(IMPACT_TIERS).flatMap(([t, v]) => [+t, darken(v.color, k)]), darken("#999999", k)];
@@ -200,8 +202,8 @@ const DIM_OPACITY = 0.08;
 const hiddenOr = (dimmed, normal) => ["case", ["boolean", ["feature-state", "hidden"], false], 0, ["boolean", ["feature-state", "dim"], false], dimmed, normal];
 const towardsDim = (v, k) => v + (DIM_OPACITY - v) * k;
 const IMPACT_OPACITY = 0.75;
+// Both impact building layers (indirect and flooded) use this
 const indirectOpacity = (k = 1) => hiddenOr(towardsDim(IMPACT_OPACITY, k), IMPACT_OPACITY);
-const floodedOpacity = indirectOpacity;
 const FACILITY_PENDING = "#808080"; // facilities not yet affected (flood advance)
 
 // Modern dam (built by the pipeline, see DAM_* in scripts/build_data.py),
@@ -214,7 +216,6 @@ const WATER_LABEL = "#08519c"; // same blue ramp as WATER, dark
 // paths stay visible through the flood.
 const RIVER_LINE = "#2171b5";
 
-// Hours as H:MM.
 // Clock times. The scenario's dam breach is at 2:00 PM, so overtopping
 // (model hour 0) starts at 5:10 AM. clock() takes model hours (since
 // overtopping) and writes "5:10 AM", "2:00 PM"; use it for every time shown.
@@ -287,49 +288,9 @@ export function facilityName(s) {
     .replace(/\bTwp\b/g, "Township").replace(/\bDlp\b/g, "DLP");
 }
 
-export function facilityPopupHtml(p, links = []) {
-  const out = links.filter((l) => l.from === p.name);
-  const takesOut = out.length
-    ? `<tr><th>Takes out</th><td>${out.length} ${out.length === 1 ? "facility" : "facilities"} (${out[0].service})<br><span class="cause">arrows on the map</span></td></tr>`
-    : "";
-  const tier = IMPACT_TIERS[p.tier];
-  const when = impactClock(p.impact_h);
-  const what = p.tier === 1
-    ? `Flooded, ${p.depth_ft} ft deep`
-    : `Loses ${p.services}<br><span class="cause">from ${p.causes}</span>`;
-  return `
-    <h3><i style="background:${tier.color}"></i>${facilityName(p.name)}</h3>
-    <div class="trigger">${p.type}</div>
-    <table><tbody>
-      <tr><th>${tier.label}</th><td>${what}</td></tr>
-      <tr><th>Offline</th><td>${when ?? "no time"}</td></tr>
-      ${takesOut}
-    </tbody></table>
-    ${p.impact_h != null && p.impact_h < 0 ? `<div class="note">Before the breach: from the river flows the model starts with.</div>` : ""}`;
-}
-
 // ---------------------------------------------------------------------------
 // Map
 
-/**
- * @param {object} opts
- * @param {string|HTMLElement} opts.container
- * @param {boolean} [opts.hash=false]       keep the view in the URL (#zoom/lat/lng/...)
- * @param {string|null} [opts.flood="depth_max"]  initial flood layer
- * @param {object} [opts.layers]            initial visibility per LAYER_GROUPS name, e.g. { buildings: false }
- * @param {boolean|string} [opts.zonePopup=true]   click a zone for its impact summary;
- *   "select" selects it without the popup (the page shows the details)
- * @param {boolean} [opts.facilityPopup=true] click a facility for a popup; false leaves the details
- *   to the page (listen to the "facility" event, look up with app.facilityInfo(name))
- * @param {boolean} [opts.controls=true]    zoom/compass and scale controls
- * @param {boolean} [opts.compass=true]     the compass (rotation) button in the zoom control
- * @param {boolean} [opts.rotate=true]      false: the reader can't change the bearing (no right-drag, two-finger twist or keyboard rotation)
- * @param {boolean} [opts.tooltips=true]    the flood value under the cursor (depth, velocity, arrival)
- * @param {boolean} [opts.facilityClick=true] click a facility to select it (and open its popup)
- * @param {boolean} [opts.facilityNames=true] hovering a facility shows its name and what happens to it, not the flood value
- * @param {boolean|number} [opts.terrain=false]  3D terrain; a number sets the exaggeration
- * @param {object} [opts.mapOptions]        passed through to maplibregl.Map
- */
 // Scale bar after the Figma design: a black and a white segment with the
 // distances above them, in miles (feet when zoomed in). Measured across the
 // middle of the map, like MapLibre's own ScaleControl.
@@ -363,25 +324,41 @@ class ScaleBar {
   }
 }
 
+/**
+ * @param {object} opts
+ * @param {string|HTMLElement} opts.container
+ * @param {boolean} [opts.hash=false]       keep the view in the URL (#zoom/lat/lng/...)
+ * @param {string|null} [opts.flood="depth_max"]  initial flood layer
+ * @param {object} [opts.layers]            initial visibility per LAYER_GROUPS name, e.g. { buildings: false }
+ * @param {boolean|string} [opts.zonePopup=true]   click a zone for its impact summary;
+ *   "select" selects it without the popup (the page shows the details)
+ * @param {boolean} [opts.controls=true]    zoom/compass and scale controls
+ * @param {boolean} [opts.compass=true]     the compass (rotation) button in the zoom control
+ * @param {boolean} [opts.rotate=true]      false: the reader can't change the bearing (no right-drag, two-finger twist or keyboard rotation)
+ * @param {boolean} [opts.tooltips=true]    the flood value under the cursor (depth, velocity, arrival)
+ * @param {boolean} [opts.facilityClick=true] click a facility to select it (pages show the details:
+ *   listen to the "facility" event, look up with app.facilityInfo(name)); a click elsewhere clears it
+ * @param {boolean} [opts.facilityNames=true] hovering a facility shows its name and what happens to it, not the flood value
+ * @param {boolean|number} [opts.terrain=false]  3D terrain; a number sets the exaggeration
+ * @param {object} [opts.mapOptions]        passed through to maplibregl.Map
+ */
 export async function createMap(opts) {
   const {
     container, hash = false, flood = "depth_max", layers = {},
-    zonePopup = true, facilityPopup: useFacilityPopup = true, controls = true, terrain = false, mapOptions = {},
+    zonePopup = true, controls = true, terrain = false, mapOptions = {},
     compass = true, rotate = true, tooltips = true, facilityClick = true, facilityNames = true,
   } = opts;
 
   const empty = { type: "FeatureCollection", features: [] };
-  const [domain, rasters, zones, impactAreas, impactBuildings, impactFacilities, impactLinks] = await Promise.all([
-    fetch(DATA + "domain.json").then((r) => r.json()),
-    fetch(DATA + "rasters.json").then((r) => r.json()),
-    fetch(DATA + "evacuation_zones.geojson").then((r) => r.json()),
-    fetch(DATA + "cascade_service_areas.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
-    fetch(DATA + "cascade_buildings.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
-    fetch(DATA + "cascade_facilities.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
-    fetch(DATA + "cascade_links.geojson").then((r) => (r.ok ? r.json() : empty)).catch(() => empty),
+  // The rasters and zones are required; the cascade files are optional (the map works without them).
+  const required = (file) => fetch(DATA + file).then((r) => r.json());
+  const [domain, rasters, zones, impactAreas, impactBuildings, impactFacilities, impactLinks, zoneArrival] = await Promise.all([
+    required("domain.json"),
+    required("rasters.json"),
+    required("evacuation_zones.geojson"),
+    ...["cascade_service_areas.geojson", "cascade_buildings.geojson", "cascade_facilities.geojson", "cascade_links.geojson"].map((f) => loadData(f, empty)),
+    loadData("zone_arrival.json", {}), // typical flood arrival per zone (build_zone_arrival)
   ]);
-  // Typical flood arrival per zone, from the flood raster (build_zone_arrival)
-  const zoneArrival = await fetch(DATA + "zone_arrival.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
   for (const f of zones.features) f.properties.arrival = zoneArrival[f.properties.Zone];
   let selectedFacility = null;
   const linksOf = (name) => impactLinks.features.map((f) => f.properties).filter((l) => l.from === name || l.to === name);
@@ -528,6 +505,7 @@ export async function createMap(opts) {
           paint: { "fill-color": zoneColor, "fill-opacity": zoneOpacity }, // stronger in focus (applyZoneFocus)
         },
         {
+          // The selected zone, darker on top of its focus fill
           id: "evac-selected-fill", type: "fill", source: "evac", filter: ["==", ["id"], -1],
           layout: { visibility: visibleAt("evac") },
           paint: { "fill-color": zoneColorDark, "fill-opacity": 0.4 },
@@ -593,7 +571,7 @@ export async function createMap(opts) {
           paint: {
             "circle-color": IMPACT_TIERS[1].color,
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 12, 1.6, 15, 3.5],
-            "circle-opacity": floodedOpacity(),
+            "circle-opacity": indirectOpacity(),
           },
         },
         {
@@ -715,16 +693,23 @@ export async function createMap(opts) {
   };
 
   const maxHours = Math.ceil(rasters.arrival_first?.max ?? 18);
-  let floodId = flood, time = 0, raf = null;
+  let floodId = flood, time = 0, raf = null, resolvePlay = null;
 
   // closeOnClick is off: its map click listener also fires on the click that
   // opens the popup on another zone, closing it again. Handled below instead.
   const popup = new maplibregl.Popup({ className: "zone-popup", maxWidth: "300px", closeOnClick: false });
-  let selectedZone = null;
-  // Zone in focus: the one under the cursor, else the selected one. It is
-  // drawn stronger and the other zones fade back, so a zone selected from the
-  // page looks the same as one clicked on the map.
-  let hoveredZone = null;
+  // Zone state. Focus is the zone under the cursor, else the selected one: it
+  // is drawn stronger and the other zones fade back, so a zone selected from
+  // the page looks the same as one clicked on the map. setZone() is the only
+  // place the selection changes (selectZone, the popup's close).
+  let selectedZone = null, hoveredZone = null;
+  function setZone(zone) {
+    if (zone === selectedZone) return;
+    selectedZone = zone;
+    map.setFilter("evac-selected-fill", ["==", ["id"], zone ?? -1]);
+    applyZoneFocus();
+    emit("zone", zone);
+  }
   function applyZoneFocus() {
     const focus = hoveredZone ?? selectedZone;
     const isFocus = ["==", ["id"], focus ?? -1];
@@ -811,7 +796,7 @@ export async function createMap(opts) {
      */
     play({ to = maxHours, speed = 0.5 } = {}) {
       app.pause();
-      if (time >= to) app.setTime(0);
+      if (time >= to - 0.01) app.setTime(0); // at the end (within a slider step): from the start
       return new Promise((resolve) => {
         let last = performance.now();
         const frame = (now) => {
@@ -822,7 +807,7 @@ export async function createMap(opts) {
           raf = requestAnimationFrame(frame);
         };
         raf = requestAnimationFrame(frame);
-        app._resolvePlay = resolve;
+        resolvePlay = resolve;
         emit("play", true);
       });
     },
@@ -830,45 +815,41 @@ export async function createMap(opts) {
       if (raf) cancelAnimationFrame(raf);
       const wasPlaying = raf !== null;
       raf = null;
-      app._resolvePlay?.();
-      app._resolvePlay = null;
+      resolvePlay?.();
+      resolvePlay = null;
       if (wasPlaying) emit("play", false);
     },
     get playing() { return raf !== null; },
 
-    /** Show or hide a layer group from LAYER_GROUPS. */
     /**
      * Show the facilities that are not flooded (the ones that lose a service later) in grey
      * before the cascade is calculated; false puts them back under the indirect impacts layer.
      */
     showNeutralFacilities(on) {
       neutralIndirect = on;
-      layerFlags.neutral = on;
-      applyNeutralFacilities();
+      applyFacilityLayers();
       cascadeCutoff = undefined; // the grey comes from the facilities' pending state
       syncCascadeTime();
     },
+    /** Show or hide a layer group from LAYER_GROUPS (or a single layer by id). */
     setLayer(name, on) {
       layerFlags[name] = on;
       (LAYER_GROUPS[name] ?? [name]).forEach((id) => setVisible(id, on));
-      applyNeutralFacilities();
+      applyFacilityLayers();
       if (name === "evac" && !on) popup.remove();
       emit("layer", { name, on });
     },
 
     /**
-     * Outline a zone (1-3), or clear with null. With { popup: lngLat } also
+     * Select a zone (1, 2), or clear with null. With { popup: lngLat } also
      * opens its impact summary there.
      */
     selectZone(zone, { popup: at } = {}) {
-      // Moving an open popup fires its "close" (which clears the selection),
-      // so handle the popup before setting the selection.
+      // Moving or removing an open popup fires its "close", which clears the
+      // selection, so the popup goes first and the selection is set after it.
       if (zone == null || !at) popup.remove();
       if (zone != null && at) popup.setLngLat(at).setHTML(zonePopupHtml(app.zoneStats(zone))).addTo(map);
-      selectedZone = zone;
-      map.setFilter("evac-selected-fill", ["==", ["id"], zone ?? -1]);
-      applyZoneFocus();
-      emit("zone", zone);
+      setZone(zone);
     },
     get zone() { return selectedZone; },
 
@@ -903,6 +884,24 @@ export async function createMap(opts) {
     setLinkProgress(k) {
       linkProgress = Math.max(0, Math.min(1, k));
       drawLinks();
+    },
+
+    /**
+     * Grow the selected facility's arrows out from it over `ms`, eased with
+     * `ease` (0-1 to 0-1). Resolves when done, or early if the selection changes.
+     */
+    growLinks(ms = 1500, ease = (k) => k) {
+      const name = selectedFacility, t0 = performance.now();
+      app.setLinkProgress(0);
+      return new Promise((resolve) => {
+        const frame = (now) => {
+          if (selectedFacility !== name) return resolve(); // the new selection draws its own arrows
+          const k = Math.min(1, (now - t0) / ms);
+          app.setLinkProgress(ease(k));
+          if (k < 1) requestAnimationFrame(frame); else resolve();
+        };
+        requestAnimationFrame(frame);
+      });
     },
 
     /**
@@ -975,68 +974,32 @@ export async function createMap(opts) {
       return Math.abs(v - r.nodata) < 0.01 ? null : v;
     },
 
-    /** Properties of a zone (1-3) from the evacuation zones file. */
+    /** Properties of a zone (1, 2) from the evacuation zones file. */
     zoneStats(zone) {
       return zones.features.find((f) => f.id === zone)?.properties;
     },
-
-    /** Bounding box [[w, s], [e, n]] of a zone, for map.fitBounds(). */
-    zoneBounds(zone) {
-      const b = new maplibregl.LngLatBounds();
-      const f = zones.features.find((f) => f.id === zone);
-      f?.geometry.coordinates.flat(2).forEach((c) => b.extend(c));
-      return b.toArray();
-    },
   };
 
-  popup.on("close", () => {
-    if (selectedZone != null) {
-      selectedZone = null;
-      map.setFilter("evac-selected-fill", ["==", ["id"], -1]);
-      applyZoneFocus();
-      emit("zone", null);
-    }
-  });
+  popup.on("close", () => setZone(null));
   // Facility tooltip: its name, then what happens to it and when ("Loss of service · 2:54 PM")
   const facilityTipHtml = (p) => {
     const t = impactClock(p.impact_h);
     const status = neutralIndirect && p.tier >= 2 ? "Not flooded" : IMPACT_TIERS[p.tier] ? IMPACT_TIERS[p.tier].label + (t ? ` · ${t}` : "") : "";
     return `<strong>${facilityName(p.name)}</strong>${status ? `<div class="tip-status">${status}</div>` : ""}`;
   };
-  // Value tooltip: follows the cursor while a layer from TOOLTIPS is shown.
-  let hoverSeq = 0;
-  map.on("mousemove", async (e) => {
-    const seq = ++hoverSeq;
-    const fac = facilityNames && facilityAt(e.point);
-    if (fac) return tooltip.setLngLat(fac.geometry.coordinates).setHTML(facilityTipHtml(fac.properties)).addTo(map);
-    const format = tooltips && TOOLTIPS[floodId];
-    if (!format) return tooltip.remove();
-    const v = await app.valueAt(floodId, e.lngLat);
-    if (seq !== hoverSeq) return; // a newer move has answered already
-    if (v == null) return tooltip.remove();
-    tooltip.setLngLat(e.lngLat).setHTML(format(v)).addTo(map);
-  });
-  map.getCanvas().addEventListener("mouseleave", () => { hoverSeq++; tooltip.remove(); });
-  app.on("flood", () => { hoverSeq++; tooltip.remove(); });
 
-  // Facility popup: click an affected facility for what happened to it.
-  const facilityPopup = new maplibregl.Popup({ className: "zone-popup", maxWidth: "300px", offset: 8 });
+  // --- Pointer ---------------------------------------------------------------
+  // One handler per event decides what is under the cursor: a facility wins
+  // over the zone under it. Hover looks, tooltip and cursor are set together,
+  // so they can't disagree.
   const facilityLayersOn = () => FACILITY_LAYERS.filter((id) => map.getLayoutProperty(id, "visibility") !== "none");
   const facilityAt = (point) => {
     const on = facilityLayersOn();
-    return on.length > 0 && map.queryRenderedFeatures(point, { layers: on }).find((f) => shown(f));
+    return (on.length && map.queryRenderedFeatures(point, { layers: on })[0]) || null;
   };
-  const shown = () => true; // facilities are always on the map (grey until affected)
-  for (const id of FACILITY_LAYERS) map.on("click", id, (e) => {
-    if (!facilityClick) return;
-    const f = e.features.find(shown);
-    if (!f) return;
-    if (useFacilityPopup) facilityPopup.setLngLat(f.geometry.coordinates).setHTML(facilityPopupHtml(f.properties, linksOf(f.properties.name))).addTo(map);
-    app.selectFacility(f.properties.name);
-  });
-  // Without the popup, a click elsewhere on the map clears the selection.
-  map.on("click", (e) => { if (!useFacilityPopup && selectedFacility && !facilityAt(e.point)) app.selectFacility(null); });
-  facilityPopup.on("close", () => app.selectFacility(null));
+  const zoneAt = (point) => (zonePopup && map.getLayoutProperty("evac-fill", "visibility") !== "none"
+    && map.queryRenderedFeatures(point, { layers: ["evac-fill"] })[0]) || null;
+
   // Hover and pressed look: feature states on the facility under the cursor
   let hoveredFacility = null, pressedFacility = null;
   const facilityState = (id, state) => id != null && map.setFeatureState({ source: "impact-facilities", id }, state);
@@ -1047,48 +1010,63 @@ export async function createMap(opts) {
     facilityState(id, { hover: true });
   };
   const releaseFacility = () => { facilityState(pressedFacility, { active: false }); pressedFacility = null; };
-  for (const id of FACILITY_LAYERS) {
-    map.on("mousemove", id, (e) => {
-      map.getCanvas().style.cursor = facilityClick && e.features.some(shown) ? "pointer" : "";
-      if (facilityClick) hoverFacility(e.features.find(shown)?.id ?? null);
-    });
-    map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; hoverFacility(null); });
-    map.on("mousedown", id, (e) => {
-      if (!facilityClick) return;
-      releaseFacility();
-      pressedFacility = e.features.find(shown)?.id ?? null;
-      facilityState(pressedFacility, { active: true });
-    });
-  }
-  window.addEventListener("mouseup", releaseFacility);
-  // With both facility layers off, nothing is left to select.
-  app.on("layer", ({ name }) => {
-    if (name in LAYER_GROUPS && /Impacts$/.test(name) && !facilityLayersOn().length) { facilityPopup.remove(); app.selectFacility(null); }
-  });
+  const hoverZone = (zone) => {
+    if (zone === hoveredZone) return;
+    hoveredZone = zone;
+    applyZoneFocus();
+  };
 
-  if (zonePopup) {
-    map.on("click", (e) => {
-      if (facilityAt(e.point)) return; // the facility popup has it
-      const hit = map.getLayoutProperty("evac-fill", "visibility") !== "none"
-        && map.queryRenderedFeatures(e.point, { layers: ["evac-fill"] })[0];
-      if (hit) app.selectZone(hit.id, zonePopup === "select" ? {} : { popup: e.lngLat });
-      else if (selectedZone != null) app.selectZone(null);
-    });
-    // Hover: stronger fill and outline on the zone under the cursor; the
-    // other zones fade back.
-    // Over a facility the facility has the cursor, so its zone drops the hover.
-    const setHover = (zone, { cursor = true } = {}) => {
-      if (zone === hoveredZone) return;
-      hoveredZone = zone;
-      applyZoneFocus();
-      if (cursor) map.getCanvas().style.cursor = zone != null ? "pointer" : "";
-    };
-    map.on("mousemove", "evac-fill", (e) => {
-      if (facilityAt(e.point)) setHover(null, { cursor: false });
-      else setHover(e.features[0]?.id ?? null);
-    });
-    map.on("mouseleave", "evac-fill", () => setHover(null));
-  }
+  let hoverSeq = 0; // the value tooltip answers asynchronously; only the latest move may show it
+  map.on("mousemove", async (e) => {
+    const seq = ++hoverSeq;
+    const fac = facilityAt(e.point);
+    const zone = fac ? null : zoneAt(e.point);
+    hoverFacility(facilityClick ? fac?.id ?? null : null);
+    hoverZone(zone?.id ?? null);
+    map.getCanvas().style.cursor = (fac && facilityClick) || zone ? "pointer" : "";
+    // Tooltip: the facility's name, else the flood value under the cursor
+    if (fac && facilityNames) return tooltip.setLngLat(fac.geometry.coordinates).setHTML(facilityTipHtml(fac.properties)).addTo(map);
+    const format = tooltips && TOOLTIPS[floodId];
+    if (!format) return tooltip.remove();
+    const v = await app.valueAt(floodId, e.lngLat);
+    if (seq !== hoverSeq) return; // a newer move has answered already
+    if (v == null) return tooltip.remove();
+    tooltip.setLngLat(e.lngLat).setHTML(format(v)).addTo(map);
+  });
+  map.getCanvas().addEventListener("mouseleave", () => {
+    hoverSeq++;
+    tooltip.remove();
+    hoverFacility(null);
+    hoverZone(null);
+    map.getCanvas().style.cursor = "";
+  });
+  app.on("flood", () => { hoverSeq++; tooltip.remove(); });
+
+  map.on("mousedown", (e) => {
+    const fac = facilityClick && facilityAt(e.point);
+    if (!fac) return;
+    releaseFacility();
+    pressedFacility = fac.id;
+    facilityState(pressedFacility, { active: true });
+  });
+  window.addEventListener("mouseup", releaseFacility);
+
+  // Click: a facility selects it; anywhere else clears the facility and
+  // selects the zone there (zonePopup), or clears the zone.
+  map.on("click", (e) => {
+    const fac = facilityAt(e.point);
+    if (fac) {
+      if (facilityClick) app.selectFacility(fac.properties.name);
+      return;
+    }
+    if (selectedFacility) app.selectFacility(null);
+    if (!zonePopup) return;
+    const zone = zoneAt(e.point);
+    if (zone) app.selectZone(zone.id, zonePopup === "select" ? {} : { popup: e.lngLat });
+    else if (selectedZone != null) app.selectZone(null);
+  });
+  // With both facility layers off, nothing is left to select.
+  app.on("layer", () => { if (selectedFacility && !facilityLayersOn().length) app.selectFacility(null); });
 
   // Fade a flood layer in from transparent. Done by hand: MapLibre's paint
   // transitions don't redraw a layer that starts at opacity 0.
@@ -1119,8 +1097,7 @@ export async function createMap(opts) {
     const seq = ++affectedSeq;
     const pids = [...new Set(names.map((n) => impactFacilities.features.find((f) => f.properties.name === n)?.properties.provider).filter(Boolean))];
     const on = pids.length > 0; // facilities that provide nothing leave the map as it is
-    const files = await Promise.all(pids.map((pid) =>
-      fetch(DATA + "cascade_by_provider/" + pid.replace("/", "_") + ".json").then((r) => (r.ok ? r.json() : empty)).catch(() => empty)));
+    const files = await Promise.all(pids.map((pid) => loadData(`cascade_by_provider/${pid.replace("/", "_")}.json`, empty)));
     if (seq !== affectedSeq) return; // another facility was selected meanwhile
     // With a fade, the facility's buildings fade in while the others fade
     // down, together: the facility's buildings are mostly the same dots, so
@@ -1136,7 +1113,7 @@ export async function createMap(opts) {
         map.setPaintProperty("cascade-flooded", "circle-opacity", towardsDim(IMPACT_OPACITY, k));
       } else if (dimFade !== 1) {
         setDotOpacity("cascade-buildings", indirectOpacity());
-        map.setPaintProperty("cascade-flooded", "circle-opacity", floodedOpacity());
+        map.setPaintProperty("cascade-flooded", "circle-opacity", indirectOpacity());
       }
       // The facility's own buildings come up faster than the others go down,
       // so the dots both layers share never get lighter on the way.
@@ -1299,11 +1276,15 @@ export async function createMap(opts) {
   const cascadeHidden = { "impact-buildings": [], "impact-facilities": [], "impact-flooded": [] };
   const cascadeData = { "impact-buildings": impactBuildings, "impact-facilities": impactFacilities, "impact-flooded": floodedBuildings };
   let cascadeCutoff;
-  function applyNeutralFacilities() {
-    for (const id of ["cascade-facilities-indirect", "cascade-facilities-indirect-icon"]) {
-      const on = neutralIndirect || (layerFlags.indirectImpacts ?? visibleAt("indirectImpacts") === "visible");
-      setVisible(id, on);
-    }
+  // The facility layers belong to several groups, so their visibility is
+  // worked out here from all of them after every change: a facility shows
+  // while its impact group or "facilities" is on (indirect ones also while
+  // showNeutralFacilities is), whatever order the groups were set in.
+  function applyFacilityLayers() {
+    const flag = (group) => layerFlags[group] ?? visibleAt(group) === "visible";
+    const all = flag("facilities");
+    for (const id of ["cascade-facilities-direct", "cascade-facilities-direct-icon"]) setVisible(id, all || flag("directImpacts"));
+    for (const id of ["cascade-facilities-indirect", "cascade-facilities-indirect-icon"]) setVisible(id, all || neutralIndirect || flag("indirectImpacts"));
   }
   function syncCascadeTime() {
     const cutoff = floodId === "arrival_first" ? Math.round((time - BREACH_HOURS) * 100) / 100 : Infinity;

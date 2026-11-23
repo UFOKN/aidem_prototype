@@ -127,7 +127,7 @@
     .card.min { width: auto; }
     .card.min > :not(.restore) { display: none; }
     .card.min button.restore { display: flex; }
-    /* Calculate cascading impacts, in the sidebar's empty indirect impacts section */
+    /* Calculate cascading impacts, in a facility's details before step 3 */
     .sidebar .calculate { width: 100%; }
 
     /* No top bar in story 5: the audience toggle sits at the top of the
@@ -186,7 +186,6 @@
     .sidebar table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     .sidebar td, .sidebar th { padding: 2px 0; text-align: right; font-weight: normal; vertical-align: top; }
     .sidebar td:first-child, .sidebar th:first-child { text-align: left; color: #555555; }
-    .sidebar .sub td:first-child { padding-left: 10px; }
     .sidebar thead th { font-size: 12px; color: #888888; }
     .sidebar .na { color: #888888; }
     /* Rows that open sub-rows (buildings by use) */
@@ -236,8 +235,7 @@
     .sidebar .lives-bars + table.group, .sidebar .lives-bars ~ table.group { margin-top: 0; }
     /* Its own group, set apart from the tables above */
     .sidebar table.group { margin-top: 16px; }
-    /* All impacts (draft): one table across the tiers, and the cascade timeline */
-    .sidebar table.cols.tiers th:not(:first-child), .sidebar table.cols.tiers td:not(:first-child) { width: 72px; }
+    /* The cascade timeline (hidden for now, SHOW_TIMELINE in story.js) */
     .sidebar .cascade { position: relative; margin: 0; padding: 0; list-style: none; }
     .sidebar .cascade li { position: relative; display: block; padding: 4px 0; cursor: pointer; }
     .sidebar .cascade li:hover { background: #f5f5f5; }
@@ -267,7 +265,7 @@
   </aside>
   <div class="card">
     <div class="head"><p class="step"></p><button class="btn minimize" data-variant="ghost" data-size="icon-sm" aria-label="Minimize the guided tour" title="Minimize"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-4v-4" /><path d="M20 4l-6 6" /><path d="M6 14h4v4" /><path d="M10 14l-6 6" /></svg></button></div>
-    <div class="content"></div>
+    <div class="content" aria-live="polite"></div>
     <nav>
       <button class="btn prev" data-variant="secondary" data-size="icon-sm" aria-label="Back" title="Back">←</button>
       <button class="btn next" data-size="sm"></button>

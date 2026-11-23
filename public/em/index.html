@@ -332,16 +332,6 @@
         font-weight: 700;
         line-height: 39px;
       }
-      .todo {
-        padding: 1px 6px;
-        border-radius: 3px;
-        background: #ffe08a;
-        color: #5c4400;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 13px;
-        letter-spacing: 0.02em;
-      }
 
       /* Detail content: the USACE sidebar's sections (../summary.js), sized like
        story 3's tables (16 px rows with dividers, 12 px grey column heads) */
@@ -827,8 +817,7 @@
         margin-top: 8px;
       }
 
-      /* Flood layer toggle, legend and clock, on the map (flooding page only;
-       boxed like story 3's map legends) */
+      /* Legend and flood control boxes on the subpage maps (cards styled in panel.css) */
       .flood-control,
       .map-legend {
         position: absolute;
@@ -837,17 +826,6 @@
         z-index: 2;
         width: 294px;
         box-sizing: border-box;
-        padding: 8px 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 4px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-        font:
-          13px/1.4 Inter,
-          system-ui,
-          sans-serif;
       }
       /* Story 5's layer panel (overview), below the product name, with story 5's toggle colours */
       .layer-panel {
@@ -888,31 +866,6 @@
       }
       .map-legend .tier-legend {
         margin: 0;
-      }
-      .flood-control .segmented.button-group {
-        display: flex;
-        width: 100%;
-      }
-      .flood-control .segmented .btn {
-        flex: 1;
-      }
-      .flood-control .legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 2px 8px;
-        font-size: 12px;
-        color: #555555;
-      }
-      .flood-control .legend span {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .flood-control .legend i {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 2px;
       }
       .flood-control [hidden] {
         display: none !important;
@@ -1375,7 +1328,7 @@
       <div class="brand">AidEM Flood Tool</div>
       <div class="content">
         <div class="audience button-group" role="group" aria-label="Audience">
-          <button class="btn" data-variant="outline" data-size="sm" aria-pressed="false" onclick="fadeTo('../#5')">
+          <button class="btn to-usace" data-variant="outline" data-size="sm" aria-pressed="false">
             USACE
           </button>
           <button class="btn" data-variant="outline" data-size="sm" aria-pressed="true">Emergency Managers</button>
@@ -1388,7 +1341,7 @@
         <p class="step"></p>
         <button class="btn minimize" data-variant="ghost" data-size="icon-sm" aria-label="Minimize the guided tour" title="Minimize"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-4v-4" /><path d="M20 4l-6 6" /><path d="M6 14h4v4" /><path d="M10 14l-6 6" /></svg></button>
       </div>
-      <div class="text"></div>
+      <div class="text" aria-live="polite"></div>
       <nav>
         <button class="btn prev" data-variant="secondary" data-size="icon-sm" aria-label="Back" title="Back">←</button>
         <button class="btn next" data-size="sm"></button>
@@ -1399,9 +1352,12 @@
       </button>
     </div>
     <script type="module">
+      // Before the data loads, so the toggle works at once
+      document.querySelector(".audience .to-usace").addEventListener("click", () => fadeTo("../#5")); // fade.js
       import { glyph } from "../map/cascade-graph.js";
       import {
         createMap,
+        loadData,
         clock,
         arrivalClock,
         impactClock,
@@ -1412,17 +1368,14 @@
         facilityIconSvg,
         FACILITY_ICONS,
       } from "../map/core.js";
-      import { legend, tierItem, createPanel } from "../map/panel.js";
-      import { timelineHtml, setPlaying, updateTimeline, watchTimeline } from "../map/timeline.js";
+      import { legend, tierItem, createPanel, floodControl } from "../map/panel.js";
       import { floodTables, toggleUses } from "../summary.js";
 
-      // --- Data (as in story 3): LifeSim per evacuation zone, cascade summary,
-      // flooded buildings by severity (../data/johnstown_cascade).
-      const getJson = (f) =>
-        fetch(`../data/${f}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null);
-      const [zoneData, impacts, useByTier, areas, facilities, facilityLinks] =
+      // --- Data: LifeSim per evacuation zone, the cascade analysis (summary,
+      // buildings by use, service areas, facilities and their links) and the
+      // typical flood arrival per zone. Loaded before the map, so the report
+      // renders while the map is still loading. Missing files come back null.
+      const [zoneData, impacts, useByTier, areas, facilities, facilityLinks, zoneArrival] =
         await Promise.all(
           [
             "evacuation_zones.geojson",
@@ -1431,14 +1384,13 @@
             "cascade_service_areas.geojson",
             "cascade_facilities.geojson",
             "cascade_links.geojson",
-          ].map(getJson),
+            "zone_arrival.json",
+          ].map((f) => loadData(f)),
         );
       const zones = (zoneData?.features ?? [])
         .map((f) => f.properties)
         .sort((a, b) => a.Zone - b.Zone);
-      // Typical flood arrival per zone (as in story 3)
-      const zoneArrival = (await getJson("zone_arrival.json")) ?? {};
-      for (const p of zones) p.arrival = zoneArrival[p.Zone];
+      for (const p of zones) p.arrival = zoneArrival?.[p.Zone];
       const sum = (k) => zones.reduce((a, p) => a + p[k], 0);
       // Every count on the page except facilities (nFac) is rounded by size: to 500 from 10,000, to 50
       // from 1,000, to 10 from 100, to 5 from 10; below 10 it stays exact
@@ -1491,13 +1443,13 @@
         if (!impacts)
           return `<p class="note">The cascade analysis didn't load.</p>`;
         const tiers = [
-          ["primary", 1, ""],
-          ["secondary", 2, "Depends on a flooded facility"],
-          ["tertiary", 3, "Depends on facility that lost service"],
-        ].map(([key, i, how]) => ({
+          ["primary", 1],
+          ["secondary", 2],
+          ["tertiary", 3],
+        ].map(([key, i]) => ({
           key,
           i,
-          how,
+          how: IMPACT_TIERS[i].note ?? "",
           ...impacts.buildings[key].first_affected,
         }));
         // Facilities (power, hospitals, schools) that flood or lose a service, by tier
@@ -1637,7 +1589,7 @@
         // A selected facility row gets a bell: notify that facility
         const BELL = `<button class="notify" aria-label="Notify this facility" title="Notify this facility"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg></button>`;
         const li = (e, i) =>
-          `<li data-i="${i}" ${e.people ? ` class="people"` : ""} aria-selected="${i === riskRow || (e.people && riskEvents[riskRow]?.name === e.of)}">${guides(e, i)}<time>${e.depth && clock(events[i - 1].h) === clock(e.h) ? "" : clock(e.h)}</time><span style="padding-left:${e.depth * IND}px">${dot(e)}<span>${e.text}</span></span>${e.name && !e.people ? BELL : ""}</li>`;
+          `<li data-i="${i}" tabindex="0"${e.people ? ` class="people"` : ""} aria-selected="${i === riskRow || (e.people && riskEvents[riskRow]?.name === e.of)}">${guides(e, i)}<time>${e.depth && clock(events[i - 1].h) === clock(e.h) ? "" : clock(e.h)}</time><span style="padding-left:${e.depth * IND}px">${dot(e)}<span>${e.text}</span></span>${e.name && !e.people ? BELL : ""}</li>`;
         return `<div class="risk">
         <h3>Estimated life loss</h3>
         <table class="tiers">
@@ -1807,12 +1759,11 @@
     </div>`;
       const zonesHtml =
         () => `<h3>Evacuation zones</h3><div class="facts"><table class="zone-columns">
-      <thead><tr><th></th>${zones.map((p) => `<th data-zone="${p.Zone}">${zoneLabel(p)}</th>`).join("")}</tr></thead>
+      <thead><tr><th></th>${zones.map((p) => `<th data-zone="${p.Zone}" tabindex="0">${zoneLabel(p)}</th>`).join("")}</tr></thead>
       ${ZONE_ROWS.map(([l, f]) => `<tr${f ? "" : ` class="subhead"`}><td>${l}</td>${zones.map((p) => `<td data-zone="${p.Zone}">${f ? f(p) : ""}</td>`).join("")}</tr>`).join("")}
       <tr class="actions"><td></td>${zones.map((p) => `<td data-zone="${p.Zone}"><button class="btn create-notice" data-variant="outline" data-size="sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>Notify</button></td>`).join("")}</tr>
     </table></div>`;
-      const label = (s) =>
-        `<span class="label">${s.label}${s.todo ? ' <span class="todo">TODO</span>' : ""}</span>`;
+      const label = (s) => `<span class="label">${s.label}</span>`;
       const overviewHtml = () => `
       <header><p class="shared">Report shared by USACE today</p><h1>South Fork Dam: Planning for dam failure</h1></header>
       <p class="lead">If South Fork Dam fails, about ${n(sum("PAR_Day"))} people are directly in the flood zone.${impacts ? ` Another ${n(first("secondary").pop_day + first("tertiary").pop_day)} lose power, schooling or hospital care, because a facility they rely on fails.` : ""} With little warning, a daytime failure could cost around ${n(sum("LL_D_Min"))} lives.</p>
@@ -1850,20 +1801,6 @@
       const areaOf = (name) =>
         areas?.features.find((f) => f.properties.name === name)?.properties;
 
-      const FLOODS = [
-        ["arrival_first", "Timeline"],
-        ["depth_max", "Depth"],
-        ["velocity_max", "Velocity"],
-      ];
-      const floodControlHtml = () => `
-      <h2 class="layer-title" data-flood="arrival_first">Flood advance</h2>
-      <h2 class="layer-title" data-flood="depth_max">Depth in feet</h2>
-      <h2 class="layer-title" data-flood="velocity_max">Velocity in feet per second</h2>
-      <div class="legend" data-flood="depth_max">${legend("depth")}</div>
-      <div class="legend" data-flood="velocity_max">${legend("velocity")}</div>
-      <div data-flood="arrival_first">${timelineHtml(app.maxHours, BREACH_HOURS)}</div>
-      <hr class="rule">
-      <div class="segmented button-group" role="group" aria-label="Flood layer">${FLOODS.map(([id, l]) => `<button class="btn" data-variant="outline" data-size="xs" data-flood="${id}" aria-pressed="false">${l}</button>`).join("")}</div>`;
       const report = document.querySelector(".report");
       report.addEventListener("click", toggleUses);
       report.addEventListener("click", (e) => {
@@ -2042,6 +1979,7 @@
       };
       const modal = document.createElement("dialog");
       modal.className = "notice-modal";
+      modal.setAttribute("aria-labelledby", "notice-modal-title");
       document.body.append(modal);
       let editing = null,
         editingList = null;
@@ -2060,7 +1998,7 @@
         const DATA = dataFor(audience, z);
         modal.innerHTML = `<form method="dialog">
         <button value="cancel" class="close" aria-label="Close" title="Close"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l12 12M16 4L4 16"/></svg></button>
-        <div><h3>Draft a public notice</h3></div>
+        <div><h3 id="notice-modal-title">Draft a public notice</h3></div>
         <div class="controls">
           <label class="field">Audience
             <select name="audience">${opt(residents)}${opt("County")}
@@ -2227,11 +2165,14 @@
         const add = e.target.closest(".new-notice");
         if (add) openNotice({ zone: add.closest(".notice-zone").dataset.zone });
       });
+      // Keyboard: Enter or Space on a notice card, a timeline row or a zone's
+      // column head acts as a click
       report.addEventListener("keydown", (e) => {
-        const card = e.key === "Enter" || e.key === " " ? e.target.closest(".notice") : null;
-        if (card) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const el = e.target.closest(".notice, .risk .when li[data-i], .zone-columns th[data-zone]");
+        if (el && el === e.target) {
           e.preventDefault();
-          card.click();
+          el.click();
         }
       });
       // Hovering a cell highlights its whole column
@@ -2340,8 +2281,9 @@
             .querySelector(`.risk .when li[data-i="${i}"]`)
             ?.scrollIntoView({ block: "center", behavior: "smooth" });
       }
-      let app = null,
+      let app = null, // the map (createMap), null while it loads
         flood = "arrival_first"; // the flooding page's layer, kept between visits; opens on its first card
+      let floodBox = null, legendBox = null, layerPanel = null; // map overlays, made with the map
       // The open page (a SECTIONS id, null for the overview). Not in the URL:
       // the URL holds the story step (#1, #2), and each step opens its page.
       let page = null;
@@ -2585,39 +2527,28 @@
         return { bounds: b, ...OVERVIEW_VIEW, padding };
       };
       { const { bounds, ...cam } = overviewCamera(); app.map.fitBounds(bounds, { ...cam, duration: 0 }); }
-      // The flood control sits on the map
-      const floodBox = document.createElement("div");
-      floodBox.className = "flood-control";
+      // The flood control sits on the map: on the flooding page at the top, on
+      // the EAP and notices pages under the legend, and on the Impacts page as
+      // the clock alone (syncRiskClock)
+      floodBox = document.createElement("div");
+      floodBox.className = "flood-control panel-card";
       floodBox.hidden = true;
-      floodBox.innerHTML = floodControlHtml();
       app.map.getContainer().append(floodBox);
-      // Legend for the other pages: the flooded area and what the page shows on it
-      const legendBox = document.createElement("div");
-      legendBox.className = "map-legend";
+      floodControl(app, floodBox);
+      // Legend for the other pages: what the page shows on the map
+      legendBox = document.createElement("div");
+      legendBox.className = "map-legend panel-card";
       app.map.getContainer().append(legendBox);
-      // The overview shows story 5's layer panel instead (its options there)
-      const layerPanel = createPanel(app, {
-        parent: app.map.getContainer(),
-        evac: false,
-        oneImpactToggle: true,
-      });
-      wireFloodControl();
+      // The overview shows story 5's layer panel instead
+      layerPanel = createPanel(app, { parent: app.map.getContainer() });
+      // The flooding page's cards follow the map's flood layer, and the page
+      // remembers it between visits
       app.on("flood", (id) => {
-        if (page === "flooding" || page === "eap" || page === "plan") {
-          flood = id;
-          syncFloodControl();
-          if (page !== "flooding") placeToggleBelowLegend();
-        }
+        if (page === "flooding" || page === "eap" || page === "plan") flood = id;
+        for (const b of report.querySelectorAll(".flood-layer"))
+          b.setAttribute("aria-pressed", b.dataset.flood === id);
+        placeFloodBox();
       });
-      app.on("time", (t) => {
-        floodBox.querySelector(".time").value = t;
-        floodBox.querySelector(".clock-time").textContent = clock(t);
-        updateTimeline(floodBox);
-      });
-      app.on(
-        "play",
-        (on) => setPlaying(floodBox.querySelector(".play"), on),
-      );
       syncMap();
 
       // A facility picked in the risk timeline: zoom to it, the facilities it depends on
@@ -2652,19 +2583,7 @@
           duration: 800,
         });
         await app.map.once("moveend");
-        if (app.facility !== name) return;
-        const GROW_MS = 1500,
-          t0 = performance.now();
-        await new Promise((resolve) => {
-          const frame = (now) => {
-            const k = Math.min(1, (now - t0) / GROW_MS);
-            if (app.facility === name) app.setLinkProgress(1 - (1 - k) ** 3);
-            if (k < 1) requestAnimationFrame(frame);
-            else resolve();
-          };
-          app.setLinkProgress(0);
-          requestAnimationFrame(frame);
-        });
+        if (app.facility === name) await app.growLinks(1500, (k) => 1 - (1 - k) ** 3);
       }
       app.on("zone", markZone);
       // A facility picked on the map (or in the timeline): on the risk overview,
@@ -2733,33 +2652,23 @@
         app.setLayer("directImpacts", page !== "flooding" && !zonesShown);
         app.setLayer("indirectImpacts", page === "risk" || page === null);
         // The notices page shows every facility (all inside the zones): clicking one drafts a notice to it
-        if (page === "plan" && uploaded)
-          for (const id of [
-            "cascade-facilities-direct",
-            "cascade-facilities-indirect",
-          ]) {
-            app.setLayer(id, true);
-            app.setLayer(`${id}-icon`, true);
-          }
-        // The flood layer toggle shows on the flooding page and, under the legend, on the EAP and notices maps (annotations, Nov 19)
-        const withToggle = page === "flooding" || page === "eap" || page === "plan";
-        document.querySelector(".flood-control").hidden = !withToggle;
-        document.querySelector(".flood-control").classList.remove("clock-only");
-        const legendBox = document.querySelector(".map-legend");
+        app.setLayer("facilities", page === "plan" && uploaded);
+        // Overlays: story 5's layer panel on the overview; elsewhere a legend and,
+        // on the flooding, EAP and notices pages, the flood toggle (annotations, Nov 19)
         layerPanel.hidden = page !== null;
+        floodBox.hidden = !(page === "flooding" || page === "eap" || page === "plan");
+        floodBox.classList.remove("clock-only");
         legendBox.hidden =
           page === null ||
           page === "flooding" ||
           ((page === "eap" || page === "plan") && !uploaded);
-        if (zonesShown)
-          legendBox.innerHTML = `<div class="legend">${legend("zones")}</div>`;
-        // Story 5's tier blocks, with each class's explainer (no "Not affected": nothing grey on this map)
-        else
-          legendBox.innerHTML = `<div class="tier-legend">${[IMPACT_TIERS[1], ...(page === "risk" ? [IMPACT_TIERS[2], IMPACT_TIERS[3]] : [])].map((t) => tierItem(t)).join("")}</div>`;
+        legendBox.innerHTML = zonesShown
+          ? `<div class="legend">${legend("zones")}</div>`
+          : // Story 5's tier blocks, with each class's explainer (no "Not affected": nothing grey on this map)
+            `<div class="tier-legend">${[IMPACT_TIERS[1], ...(page === "risk" ? [IMPACT_TIERS[2], IMPACT_TIERS[3]] : [])].map((t) => tierItem(t)).join("")}</div>`;
         if (page === "flooding") {
           app.setFlood(flood);
           app.setTime(app.maxHours);
-          syncFloodControl();
           fit(app.zones.features);
         } else if (page === null) {
           app.setFlood("depth_max");
@@ -2770,70 +2679,27 @@
           app.setFlood("arrival_first");
           app.setTime(app.maxHours);
           if (page === "risk") fit(app.impactAreas.features);
-          else if (page === "eap" || page === "plan")
-            fit(app.zones.features); // the whole flood area, with or without the zones
+          else fit(app.zones.features); // EAP and notices: the whole flood area, with or without the zones
         }
-        if (page === "eap" || page === "plan") {
-          flood = "arrival_first";
-          syncFloodControl();
-          placeToggleBelowLegend();
-        }
+        placeFloodBox();
         syncPill();
       }
-      // On the risk overview a picked timeline row sets the map's time: the
-      // clock and slider show then, below the legend
+      // The flood control's place: at the top without a legend (flooding page),
+      // else under the legend
+      function placeFloodBox() {
+        if (!floodBox) return;
+        floodBox.style.top = legendBox.hidden
+          ? ""
+          : `${legendBox.offsetTop + legendBox.offsetHeight + 8}px`;
+      }
+      // On the Impacts page a picked timeline row sets the map's time: the
+      // clock and slider show then, under the legend
       function syncRiskClock() {
-        const box = document.querySelector(".flood-control"),
-          legendBox = document.querySelector(".map-legend");
-        if (!box || page === "flooding") return;
-        const on = page === "risk" && riskRow != null;
-        box.hidden = !on;
-        box.classList.toggle("clock-only", on);
-        if (!on) {
-          box.style.top = "";
-          return;
-        }
-        for (const el of box.querySelectorAll(":scope > [data-flood]"))
-          el.hidden = el.dataset.flood !== "arrival_first";
-        box.style.top = `${legendBox.offsetTop + legendBox.offsetHeight + 8}px`;
-      }
-      // On the EAP and notices pages the toggle sits under the legend, if there is one
-      function placeToggleBelowLegend() {
-        const box = document.querySelector(".flood-control"),
-          legendBox = document.querySelector(".map-legend");
-        box.style.top = legendBox.hidden ? "" : `${legendBox.offsetTop + legendBox.offsetHeight + 8}px`;
-      }
-      function syncFloodControl() {
-        const box = document.querySelector(".flood-control");
-        if (!box) return;
-        for (const b of box.querySelectorAll(".segmented button"))
-          b.setAttribute("aria-pressed", b.dataset.flood === flood);
-        for (const el of box.querySelectorAll(":scope > [data-flood]"))
-          el.hidden = el.dataset.flood !== flood;
-        box.style.top = "";
-        for (const b of report.querySelectorAll(".flood-layer"))
-          b.setAttribute("aria-pressed", b.dataset.flood === flood);
-      }
-      function wireFloodControl() {
-        const box = document.querySelector(".flood-control");
-        const slider = box.querySelector(".time");
-        slider.max = app.maxHours;
-        slider.value = app.maxHours;
-        box.querySelector(".clock-time").textContent = clock(app.maxHours);
-        updateTimeline(box);
-        watchTimeline(box);
-        for (const b of box.querySelectorAll(".segmented button"))
-          b.addEventListener("click", () => app.setFlood(b.dataset.flood));
-        slider.addEventListener("input", () => {
-          app.pause();
-          app.setTime(+slider.value);
-        });
-        box.querySelector(".play").addEventListener("click", () => {
-          if (app.playing) return app.pause();
-          if (app.time >= app.maxHours - 0.01) app.setTime(0);
-          app.play({ speed: 0.5 });
-        });
-        syncFloodControl();
+        if (!floodBox || page !== "risk") return;
+        const on = riskRow != null;
+        floodBox.hidden = !on;
+        floodBox.classList.toggle("clock-only", on);
+        placeFloodBox();
       }
 
       window.app = app; // for debugging and Figma captures

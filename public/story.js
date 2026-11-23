@@ -2,7 +2,7 @@
 // of story 1 (Figma: AidEM, Section 1, node 12:408). The current step is kept
 // in the URL hash (#2); the last step leads to the EM interface (em/).
 
-import { createMap, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, clock, facilityName, FACILITY_ICONS, facilityIconSvg } from "./map/core.js";
+import { createMap, loadData, BREACH_HOURS, IMPACT_TIERS, ZONES, impactClock, facilityName, FACILITY_ICONS, facilityIconSvg } from "./map/core.js";
 import { createPanel } from "./map/panel.js";
 import { cascadeGraphSvg } from "./map/cascade-graph.js";
 import { floodTables, toggleUses } from "./summary.js";
@@ -13,13 +13,13 @@ const DAM_VIEW = { center: [-78.774338, 40.348515], zoom: 16.72, bearing: 176.3,
 // Step 1: the dam sits in the space right of the story card (360 px wide, 10 px in)
 const DAM_PADDING = { top: 0, right: 0, bottom: 0, left: 380 };
 
-// Cascading impacts summary (data/johnstown_cascade, copied by the pipeline).
-const impacts = await fetch("data/cascade_summary.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
-// The same buildings by use (homes, businesses, ...) in each tier, for the expandable buildings table.
-const useByTier = await fetch("data/cascade_use_by_tier.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
-// Facilities, their links and service areas, for the combined impacts section (as story 4's risk overview)
-const getJson = (f) => fetch(`data/${f}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-const [cascadeFacilities, cascadeLinks, serviceAreas] = await Promise.all(["cascade_facilities.geojson", "cascade_links.geojson", "cascade_service_areas.geojson"].map(getJson));
+// The cascade analysis for the sidebar's impacts tables (scripts/build_data.py,
+// build_cascade): its summary, each tier's buildings by use, and the facilities,
+// their links and service areas. Any of them may be missing (null).
+const [impacts, useByTier, cascadeFacilities, cascadeLinks, serviceAreas] = await Promise.all(
+  ["cascade_summary.json", "cascade_use_by_tier.json", "cascade_facilities.geojson", "cascade_links.geojson", "cascade_service_areas.geojson"].map((f) => loadData(f)));
+const n = (v) => Math.round(v).toLocaleString("en-US");
+const tierSwatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}${IMPACT_TIERS[i].stroke ? `; box-shadow: inset 0 0 0 1px ${IMPACT_TIERS[i].stroke}` : ""}"></i>`;
 
 const app = await createMap({
   compass: false,
@@ -261,20 +261,6 @@ function showPill() {
 }
 function hidePill() { pill?.remove(); }
 app.on("facility", (name) => { if (name) hidePill(); else showPill(); });
-// The selected facility's arrows grow out from it.
-async function growLinks() {
-  const GROW_MS = 1500, t0 = performance.now();
-  app.setLinkProgress(0);
-  await new Promise((resolve) => {
-    const frame = (now) => {
-      const k = Math.min(1, (now - t0) / GROW_MS);
-      app.setLinkProgress(ease(k));
-      if (k < 1) requestAnimationFrame(frame); else resolve();
-    };
-    requestAnimationFrame(frame);
-  });
-}
-
 // Step 2 to 3: zoom out to the whole map, keeping the reader's flood layer,
 // and fade in the buildings that lose a service. Nothing is selected: the
 // "Show cascades" pill next to the power plant shows one cascade on click.
@@ -304,15 +290,13 @@ async function playCascade() {
   setSkip(null);
   if (keep && app.facility === keep) {
     app.setCascades(true, { buildings: false });
-    app.setLinkProgress(0);
-    await Promise.all([app.fadeInIndirectBuildings(1200), growLinks()]);
+    await Promise.all([app.fadeInIndirectBuildings(1200), app.growLinks(1500, ease)]);
     if (step() && app.facility === keep) app.showAffectedBuildings({ fade: 1000 });
     return;
   }
   await buildingsIn;
   if (step()) showPill();
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- Camera helpers ------------------------------------------------------------
 
@@ -364,9 +348,8 @@ function flyTo(camera, duration = 2500) {
 let panel = null;
 // Without slide they appear in place (body.instant turns the transitions off).
 function ensurePanel() {
-  // No evacuation zones toggle in story 5, and one toggle for both impact groups
-  // (indirect ones only once the cascade is calculated, step 3 on)
-  panel ??= createPanel(app, { evac: false, oneImpactToggle: true, impactGroups: () => (current >= 2 ? ["directImpacts", "indirectImpacts"] : ["directImpacts"]) });
+  // The Impacts switch brings back the indirect impacts only once the cascade is calculated (step 3 on)
+  panel ??= createPanel(app, { impactGroups: () => (current >= 2 ? ["directImpacts", "indirectImpacts"] : ["directImpacts"]) });
   return panel;
 }
 // The flood slider alone shows already while the flood runs (step 1 to 2): no layer toggle, no impacts
@@ -424,7 +407,6 @@ function renderDetail() {
 }
 
 function facilityHtml(p) {
-  const n = (v) => Math.round(v).toLocaleString("en-US");
   const tier = IMPACT_TIERS[p.tier];
   const when = impactClock(p.impact_h);
   const inLinks = p.links.filter((l) => l.to === p.name), outLinks = p.links.filter((l) => l.from === p.name);
@@ -461,13 +443,10 @@ function sidebarHtml() {
     <section class="indirect" hidden></section></div>`;
 }
 
-// Cascading impacts from the analysis's summary (round 2). Buildings and
-// people are counted once, in the first tier where they lose something, so
-// the tiers add up; facilities likewise. Primary buildings are any that get
-// wet (NSI), so the count differs from LifeSim's structures above.
-// Lives at risk and All impacts from the flood modeling step (2) on (Figma
-// comment, Nov 18); step 2 leaves out the indirect life loss row, which waits
-// for the cascade step (3). Before step 2, nothing (an empty, hidden placeholder).
+// Estimated life loss and impacts from the flood modeling step (2) on (Figma
+// comment, Nov 18); step 2 leaves out the indirect life loss row and the
+// indirect tiers, which wait for the cascade step (3). Before step 2, nothing
+// (an empty, hidden placeholder).
 function syncIndirect() {
   const el = sidebar.querySelector("section.indirect");
   if (!el) return;
@@ -482,7 +461,6 @@ function syncIndirect() {
 function livesBars(zones) {
   const tot = (k) => zones.reduce((a, z) => a + z[k], 0);
   const [a, b] = [tot("LL_D_Min"), tot("LL_D_Amp")];
-  const n = (v) => Math.round(v).toLocaleString("en-US");
   return `<div class="lives-bars" role="img" aria-label="Direct life loss: ${n(a)} with 0 to 2 hours of warning, ${n(b)} with 2 to 6 hours">
       <div class="lbl"><span>0\u202F–\u202F2 h warning</span><b>${n(a)}</b></div>
       <div class="bar" style="width:100%; background:${IMPACT_TIERS[1].color}"></div>
@@ -493,8 +471,8 @@ function livesBars(zones) {
 
 function impactsHtml(cascaded = true) {
   const zones = Object.keys(ZONES).map((n) => app.zoneStats(+n));
-  // Lives at risk, with the same content as story 4's risk overview (LifeSim)
-  const sum = (k) => Math.round(zones.reduce((a, z) => a + z[k], 0)).toLocaleString("en-US");
+  // The same LifeSim figures as the EM interface's Impacts page
+  const sum = (k) => n(zones.reduce((a, z) => a + z[k], 0));
   return `<section class="indirect">
     <h2>Estimated life loss</h2>
     ${livesBars(zones)}
@@ -505,25 +483,24 @@ function impactsHtml(cascaded = true) {
     </section>${allImpactsHtml(!cascaded)}`;
 }
 
-// All impacts (draft, from story 4's risk overview, made compact for the
-// sidebar's width and an expert reader): one table across the three tiers with
-// people, buildings and facilities, each tier opening into building uses and
-// facility kinds; then the cascade as a timeline of facilities, each failure
-// under the one that causes it, with the people it leaves without a service on
-// a second line. A timeline row selects its facility (details and graph).
+// Estimated impacts (from the EM interface's Impacts page, made compact for the
+// sidebar): people, critical facilities and other structures per tier, each
+// counted once in its first tier so the tiers add up; tier rows open into
+// facility kinds and building uses. Then, hidden for now (SHOW_TIMELINE), the
+// cascade as a timeline of facilities, each failure under the one that causes
+// it; a timeline row selects its facility (details and graph).
 const KINDS = [["energy", "Power"], ["hospital", "Hospitals"], ["school", "Schools"]];
 const SHOW_TIMELINE = false; // the cascade timeline is hidden for now (user, Nov 2026)
 // pending (step 2, before the cascade is calculated): the indirect tiers are
 // faded, without numbers, and the totals count the flooded tier only.
 function allImpactsHtml(pending = false) {
   if (!impacts || !cascadeFacilities) return "";
-  const n = (v) => Math.round(v).toLocaleString("en-US");
   const facs = cascadeFacilities.features.map((f) => f.properties);
   const links = (cascadeLinks?.features ?? []).map((f) => f.properties);
   const areaOf = (name) => serviceAreas?.features.find((f) => f.properties.name === name)?.properties;
   const kindOf = (type) => Object.keys(FACILITY_ICONS).find((k) => FACILITY_ICONS[k].types.includes(type));
   const facCount = (tier, kind) => facs.filter((p) => (tier == null || p.tier === tier) && (!kind || kindOf(p.type) === kind)).length;
-  const swatch = (i) => `<i style="background:${IMPACT_TIERS[i].color}${IMPACT_TIERS[i].stroke ? `; box-shadow: inset 0 0 0 1px ${IMPACT_TIERS[i].stroke}` : ""}"></i>`;
+  const swatch = tierSwatch;
   const num = (v) => (v ? n(v) : `<span class="na">–</span>`);
   const tiers = [["primary", 1], ["secondary", 2], ["tertiary", 3]].map(([key, i]) => ({ key, i, ...impacts.buildings[key].first_affected }));
   // Three tables, each under its own heading: people per tier, structures
@@ -641,7 +618,7 @@ const content = document.querySelector(".card .content");
 const prev = document.querySelector(".card .prev");
 const next = document.querySelector(".card .next");
 const startOver = document.querySelector(".card .start-over");
-// Minimize: the card shrinks to a "Guided tour +" button that opens it again
+// Minimize: the card shrinks to a "Guided tour" button that opens it again
 document.querySelector(".card .head").addEventListener("click", () => card.classList.add("min")); // the whole header row, as in the EM interface
 document.querySelector(".card .restore").addEventListener("click", () => card.classList.remove("min"));
 let current = -1;
@@ -654,6 +631,8 @@ function setCardText(html) {
   if (old) {
     const card = content.parentElement;
     old.classList.add("leaving");
+    old.removeAttribute("aria-live"); // the old text isn't read again on its way out
+    old.setAttribute("aria-hidden", "true");
     for (const el of old.querySelectorAll(".enter")) { el.classList.remove("enter"); el.style.animationDelay = ""; } // already shown
     Object.assign(old.style, { top: `${content.offsetTop}px`, left: `${content.offsetLeft}px`, width: `${content.offsetWidth}px` });
     card.append(old);

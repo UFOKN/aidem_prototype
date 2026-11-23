@@ -6,7 +6,9 @@
   display: flex; flex-direction: column; gap: 10px; width: 294px; /* the cards under the product name, 10 px from the edge (Figma comment, Nov 19) */
   font: 13px/1.4 system-ui, sans-serif; color: var(--panel-text);
 }
-.layer-panel .panel-card {
+/* A white card over the map: the layer panel's cards, and the EM page's legend and flood boxes */
+.panel-card {
+  font: 13px/1.4 system-ui, sans-serif; color: var(--panel-text);
   padding: 10px 12px;
   background: color-mix(in srgb, var(--panel-bg) 95%, transparent); border-radius: 6px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
@@ -19,12 +21,12 @@
 .layer-panel section + section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
 .layer-panel label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .layer-panel label.disabled { cursor: default; opacity: 0.5; }
-.layer-panel .advance { margin-top: 6px; }
-.layer-panel .advance[hidden] { display: none; }
+:is(.layer-panel, .flood-control) .advance { margin-top: 6px; }
+:is(.layer-panel, .flood-control) .advance[hidden] { display: none; }
 /* Segmented toggle for the flood layer (Figma: like the toolbar's audience switch).
    Pages can colour it with --segment-* (story 1 uses the slate scheme). */
-.layer-panel .segmented.button-group { display: flex; width: 100%; }
-.layer-panel .segmented .btn { flex: 1; }
+:is(.layer-panel, .flood-control) .segmented.button-group { display: flex; width: 100%; }
+:is(.layer-panel, .flood-control) .segmented .btn { flex: 1; }
 /* Basecoat buttons used as toggles (aria-pressed): the pressed one is solid. A page can recolour
    it with --segment-bg / --segment-text. */
 .btn[data-variant][aria-pressed="true"], .btn[data-variant][aria-pressed="true"]:hover { background-color: var(--segment-bg, var(--color-primary)); color: var(--segment-text, var(--color-primary-foreground)); cursor: default; }
@@ -59,8 +61,6 @@
 .layer-panel .switch:checked { box-shadow: inset 0 0 0 1.5px var(--segment-bg, #4a5d70); }
 .layer-panel .switch:checked::before { transform: translateX(12px); background: var(--segment-bg, #4a5d70); }
 .layer-panel .switch:focus-visible { outline: 2px solid var(--segment-bg, #4a5d70); outline-offset: 2px; }
-
-.flood-control hr.rule { margin: 2px -10px; }
 
 /* Time slider (timeline.js; Figma 559:388): the track with the played part and a grabber, the breach marked
    by a red line running below the track to its "Breach" label, the time right of the playhead (left of the slider once it no longer fits), play button beside */
