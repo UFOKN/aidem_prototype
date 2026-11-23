@@ -1452,9 +1452,10 @@
           how: IMPACT_TIERS[i].note ?? "",
           ...impacts.buildings[key].first_affected,
         }));
-        // Facilities (power, hospitals, schools) that flood or lose a service, by tier
+        // Facilities (power, water, hospitals, schools) that flood or lose a service, by tier
         const KINDS = [
           ["energy", "Power"],
+          ["water", "Water"],
           ["hospital", "Hospitals"],
           ["school", "Schools"],
         ];
@@ -1518,9 +1519,10 @@
               : []),
             ...facilityProps
               .filter(
+                // each facility once, under its first cause
                 (p) =>
                   p.impact_h != null &&
-                  links.some((l) => l.from === e.name && l.to === p.name),
+                  (p.causes ?? "").split("; ").includes(e.name),
               )
               .map(event)
               .sort(byTime),
@@ -1766,7 +1768,7 @@
       const label = (s) => `<span class="label">${s.label}</span>`;
       const overviewHtml = () => `
       <header><p class="shared">Report shared by USACE today</p><h1>South Fork Dam: Planning for dam failure</h1></header>
-      <p class="lead">If South Fork Dam fails, about ${n(sum("PAR_Day"))} people are directly in the flood zone.${impacts ? ` Another ${n(first("secondary").pop_day + first("tertiary").pop_day)} lose power, schooling or hospital care, because a facility they rely on fails.` : ""} With little warning, a daytime failure could cost around ${n(sum("LL_D_Min"))} lives.</p>
+      <p class="lead">If South Fork Dam fails, about ${n(sum("PAR_Day"))} people are directly in the flood zone.${impacts ? ` Another ${n(first("secondary").pop_day + first("tertiary").pop_day)} lose power, drinking water, schooling or hospital care, because a facility they rely on fails.` : ""} With little warning, a daytime failure could cost around ${n(sum("LL_D_Min"))} lives.</p>
       <p class="lead">${n(sum("All_Struct"))} buildings are in the flood zone, ${nFac(sum("Crt_Struct"))} of them critical facilities.</p>
       ${[...new Set(SECTIONS.map((s) => s.group))]
         .map(
@@ -1793,6 +1795,7 @@
         Hospitals: "Hospital",
         Schools: "School",
         "Electric Power Generation": "Power plant",
+        "Water Treatment": "Water plant",
         "Electric Substations": "Substation",
       };
       const facilityProps = (facilities?.features ?? []).map(

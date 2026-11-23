@@ -63,12 +63,15 @@ DOMAIN_SHP = SOURCE / "b_Potential Map Boundary" / "AidEM_MapDomain.shp"
 EVAC_SHP = SOURCE / "c_Evacuation Zones v2" / "Evacuation_Zones_v2.shp"
 
 # Cascading impacts (primary, secondary, tertiary) from the dam failure
-# analysis in "../data/cascades v3" (round 3, Nov 2026: schools, hospitals and
-# power only; see the README there). Already in
+# analysis: round 4, made by scripts/cascade_round4.py from round 3's output
+# ("../data/cascades v3", Nov 2026: schools, hospitals and power; see the
+# README there) plus the hypothetical Franklin Water Utilities from the team's
+# Critical Infrastructure v4, which loses power and cuts drinking water in
+# its service area. Run that script first when round 3 or v4 change. Already in
 # WGS84. Facilities and service areas are slimmed to what the map shows;
 # buildings become points with their first tier only (1-3), since there are
 # ~51,000 of them. Service areas are simplified by CASCADE_SIMPLIFY degrees.
-CASCADE_DIR = SOURCE / "cascades v3" / "cambria_county_cascade_round3" / "output"
+CASCADE_DIR = SOURCE / "cascades v4" / "output"
 CASCADE_SIMPLIFY = 0.0002  # ~20 m
 
 # Modern dam at the South Fork Dam site, drawn as 3D map layers. The flood
@@ -334,8 +337,8 @@ def build_cascade() -> None:
             "geometry": json.loads(json.dumps(mapping(geom)), parse_float=lambda s: round(float(s), 5)),
             "properties": {
                 "name": p["name"].strip(), "kind": p["kind"], "service": p["service"],
-                # utility: power, which other facilities depend on
-                "utility": p["kind"] in ("Electric Power Generation", "Electric Substations"),
+                # utility: power or water, which other facilities depend on
+                "utility": p["kind"] in ("Electric Power Generation", "Electric Substations", "Water Treatment"),
                 "tier": tiers[p["tier"]], "certainty": p["certainty"], "basis": p["area_basis"],
                 "offline_h": hours(p["offline_h"]), "buildings": p["buildings"],
                 "pop_night": round(p["pop_night"] or 0), "pop_day": round(p["pop_day"] or 0),

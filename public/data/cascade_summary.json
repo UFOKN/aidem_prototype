@@ -1,10 +1,11 @@
 {
   "note": "affected: every building or facility that loses something in the tier (tiers overlap); first_affected: counted once, in its earliest tier (adds up to the total); times in hours after the dam failure",
-  "round": 3,
+  "round": 4,
+  "derived_from": "round 3's output plus Franklin Water Utilities (Critical Infrastructure v4), by Prototype/scripts/cascade_round4.py",
   "fail_depth_ft": 2.0,
   "building_depth_ft": 0.0,
   "dam_failure_h": 8.83,
-  "cikr_records": 715,
+  "cikr_records": 716,
   "buildings": {
     "primary": {
       "affected": {
@@ -39,9 +40,9 @@
     "tertiary": {
       "affected": {
         "modelled": {
-          "count": 35968,
-          "pop_night": 66210,
-          "pop_day": 48672
+          "count": 38603,
+          "pop_night": 70846,
+          "pop_day": 51515
         }
       },
       "first_affected": {
@@ -72,25 +73,33 @@
     "secondary": {
       "affected": {
         "modelled": {
-          "count": 4
+          "count": 5
         }
       },
       "first_affected": {
-        "count": 4
+        "count": 5
       },
       "first_affected_from_h": 0.9,
       "affected_by_type": {
         "Schools": 2,
-        "Hospitals": 2
+        "Hospitals": 2,
+        "Water Treatment": 1
       }
     },
     "tertiary": {
-      "affected": {},
-      "first_affected": {
-        "count": 0
+      "affected": {
+        "modelled": {
+          "count": 3
+        }
       },
-      "first_affected_from_h": null,
-      "affected_by_type": {}
+      "first_affected": {
+        "count": 2
+      },
+      "first_affected_from_h": 0.9,
+      "affected_by_type": {
+        "Schools": 2,
+        "Hospitals": 1
+      }
     }
   },
   "failed_providers": {
@@ -101,9 +110,12 @@
     },
     "secondary": {
       "Hospitals": 2,
-      "Schools": 2
+      "Schools": 2,
+      "Water Treatment": 1
     },
-    "tertiary": {}
+    "tertiary": {
+      "Schools": 2
+    }
   },
   "wet_below_fail_depth": [
     {
@@ -134,6 +146,7 @@
         "hospitals": 1,
         "schools": 4,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       },
       "secondary": {
@@ -145,17 +158,19 @@
         "hospitals": 0,
         "schools": 0,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       },
       "tertiary": {
-        "buildings": 309,
+        "buildings": 347,
         "buildings_first_affected": 5,
-        "pop_night": 593,
-        "pop_day": 371,
+        "pop_night": 645,
+        "pop_day": 415,
         "facilities": 0,
         "hospitals": 0,
         "schools": 0,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": 0.9
       },
       "any": {
@@ -167,6 +182,7 @@
         "hospitals": 1,
         "schools": 4,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       }
     },
@@ -180,6 +196,7 @@
         "hospitals": 0,
         "schools": 1,
         "power_facilities": 1,
+        "water_facilities": 0,
         "earliest_impact_h": -2.9
       },
       "secondary": {
@@ -187,21 +204,23 @@
         "buildings_first_affected": 5196,
         "pop_night": 10064,
         "pop_day": 7830,
-        "facilities": 4,
+        "facilities": 5,
         "hospitals": 2,
         "schools": 2,
         "power_facilities": 0,
+        "water_facilities": 1,
         "earliest_impact_h": -8.83
       },
       "tertiary": {
-        "buildings": 4193,
+        "buildings": 5611,
         "buildings_first_affected": 773,
-        "pop_night": 8372,
-        "pop_day": 7016,
-        "facilities": 0,
-        "hospitals": 0,
+        "pop_night": 10797,
+        "pop_day": 8692,
+        "facilities": 1,
+        "hospitals": 1,
         "schools": 0,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": 0.9
       },
       "any": {
@@ -209,10 +228,11 @@
         "buildings_first_affected": 6368,
         "pop_night": 12304,
         "pop_day": 10634,
-        "facilities": 6,
+        "facilities": 7,
         "hospitals": 2,
         "schools": 3,
         "power_facilities": 1,
+        "water_facilities": 1,
         "earliest_impact_h": -8.83
       }
     },
@@ -226,6 +246,7 @@
         "hospitals": 0,
         "schools": 0,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": null
       },
       "secondary": {
@@ -237,17 +258,19 @@
         "hospitals": 0,
         "schools": 0,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       },
       "tertiary": {
-        "buildings": 31466,
+        "buildings": 32645,
         "buildings_first_affected": 27140,
-        "pop_night": 57245,
-        "pop_day": 41285,
-        "facilities": 0,
+        "pop_night": 59404,
+        "pop_day": 42408,
+        "facilities": 2,
         "hospitals": 0,
-        "schools": 0,
+        "schools": 2,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": 0.9
       },
       "any": {
@@ -255,10 +278,11 @@
         "buildings_first_affected": 38516,
         "pop_night": 69507,
         "pop_day": 51526,
-        "facilities": 0,
+        "facilities": 2,
         "hospitals": 0,
-        "schools": 0,
+        "schools": 2,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       }
     },
@@ -272,6 +296,7 @@
         "hospitals": 1,
         "schools": 5,
         "power_facilities": 1,
+        "water_facilities": 0,
         "earliest_impact_h": -8.83
       },
       "secondary": {
@@ -279,21 +304,23 @@
         "buildings_first_affected": 16916,
         "pop_night": 30939,
         "pop_day": 23221,
-        "facilities": 4,
+        "facilities": 5,
         "hospitals": 2,
         "schools": 2,
         "power_facilities": 0,
+        "water_facilities": 1,
         "earliest_impact_h": -8.83
       },
       "tertiary": {
-        "buildings": 35968,
+        "buildings": 38603,
         "buildings_first_affected": 27918,
-        "pop_night": 66210,
-        "pop_day": 48672,
-        "facilities": 0,
-        "hospitals": 0,
-        "schools": 0,
+        "pop_night": 70846,
+        "pop_day": 51515,
+        "facilities": 3,
+        "hospitals": 1,
+        "schools": 2,
         "power_facilities": 0,
+        "water_facilities": 0,
         "earliest_impact_h": 0.9
       },
       "any": {
@@ -301,10 +328,11 @@
         "buildings_first_affected": 47421,
         "pop_night": 87459,
         "pop_day": 75453,
-        "facilities": 11,
+        "facilities": 14,
         "hospitals": 3,
-        "schools": 7,
+        "schools": 9,
         "power_facilities": 1,
+        "water_facilities": 1,
         "earliest_impact_h": -8.83
       }
     }

@@ -489,7 +489,7 @@ function impactsHtml(cascaded = true) {
 // facility kinds and building uses. Then, hidden for now (SHOW_TIMELINE), the
 // cascade as a timeline of facilities, each failure under the one that causes
 // it; a timeline row selects its facility (details and graph).
-const KINDS = [["energy", "Power"], ["hospital", "Hospitals"], ["school", "Schools"]];
+const KINDS = [["energy", "Power"], ["water", "Water"], ["hospital", "Hospitals"], ["school", "Schools"]];
 const SHOW_TIMELINE = false; // the cascade timeline is hidden for now (user, Nov 2026)
 // pending (step 2, before the cascade is calculated): the indirect tiers are
 // faded, without numbers, and the totals count the flooded tier only.
@@ -528,7 +528,8 @@ function allImpactsHtml(pending = false) {
   const hasCause = (p) => links.some((l) => l.to === p.name && facs.some((q) => q.name === l.from));
   const events = [];
   const add = (e, depth, lasts) => {
-    const kids = facs.filter((p) => p.impact_h != null && links.some((l) => l.from === e.name && l.to === p.name)).map(event).sort((a, b) => a.h - b.h);
+    // Each facility once, under its first cause (it may lose services from several)
+    const kids = facs.filter((p) => p.impact_h != null && (p.causes ?? "").split("; ").includes(e.name)).map(event).sort((a, b) => a.h - b.h);
     events.push({ ...e, depth, lasts, hasKids: kids.length > 0 });
     kids.forEach((k, i) => add(k, depth + 1, [...lasts, i === kids.length - 1]));
   };
